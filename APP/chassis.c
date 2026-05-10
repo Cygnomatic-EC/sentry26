@@ -2,8 +2,6 @@
 #include <string.h>
 #include "robot_config.h"
 #include "arm_math.h"
-#include "can.h"
-#include "usart.h"
 #include "user_lib.h"
 #include "pid.h"
 #include "dwt/bsp_dwt.h"
@@ -29,7 +27,7 @@ static void chassis_calc_gimbalmotor_angle(chassis_t* chassis_ptr);
 static void chassis_calc_wheelmotor_pidout(chassis_t* chassis_ptr);
 static void chassis_calc_gimbalmotor_pidout(chassis_t* chassis_ptr);
 static void chassis_set_max_power(chassis_t* chassis_ptr);
-static void chassis_update_power_param(chassis_t* chassis_ptr);
+static void chassis_update_power_param(const chassis_t* chassis_ptr);
 static void chassis_limit_power(chassis_t* chassis_ptr);
 static void chassis_send_wheelmotor_cmd(const chassis_t* chassis_ptr);
 static void chassis_send_gimbalmotor_cmd(const chassis_t* chassis_ptr);
@@ -41,20 +39,17 @@ static void chassis_send_referee_info(const chassis_t* chassis_ptr);
  */
 void Chassis_Init(chassis_t* chassis_ptr)
 {
-    DWT_Init(DWT_CLOCK_FREQ);
-    dbus_init(&chassis_ptr->rc, RC_CAN, &hcan2);
-	mf9025_init(&chassis_ptr->mf9025, &hcan1, MF9025_TX_MIN);
-    mf9025_speed_init(&chassis_ptr->mf9025, mf9025_speed_pid_config);
-    m3508_init(&chassis_ptr->m3508, &hcan1, M3508_TX_1, 4);
-    
-    BMI088_Init(&chassis_ptr->bmi088);
-    initPowerControllerConfig(&chassis_ptr->power_ctrl_config, M3508_TORQUE_CONST, M3508_CURRENT_LIMIT, M3508_OUTPUT_LIMIT,
-        K1_CONST,  K2_CONST, K3_CONST, sentinelMaxPower[0]);
-    PowerControl_Init(&chassis_ptr->ctx);
-    super_cap_init(&chassis_ptr->super_cap, &hcan1);
-    NUC_Init(&chassis_ptr->nuc_ctrl, &huart6);
-    Referee_Init(&chassis_ptr->referee, &huart1);
-    CBoard_Chassis_Init(&chassis_ptr->cbord_chassis, &hcan2);
+    chassis_ptr->bmi088 = Get_BMI088_Ptr();
+    chassis_ptr->m3508 = Get_M3508_Ptr(M3508_TX_1);
+    chassis_ptr->cboard_chassis = Get_CBoard_Chassis_Ptr();
+    chassis_ptr->ctx = Get_PowerControlParam_Ptr();
+    chassis_ptr->mf9025 = Get_MF9025_Ptr(MF9025_TX_MIN);
+    chassis_ptr->nuc_ctrl = Get_NUC_Ctrl_Instance();
+    chassis_ptr->power_ctrl_config = Get_PowerControllerConfig_Ptr();
+    chassis_ptr->power_ctrl_result = Get_PowerAllocationResult_Ptr();
+    chassis_ptr->rc = Get_DBUS_Instance();
+    chassis_ptr->referee = Get_Referee_Instance();
+    chassis_ptr->super_cap = Get_SuperCap_Instance();
 
     memset(&chassis_ptr->ctrl, 0, sizeof(chassis_ptr->ctrl));
     chassis_filter_init(chassis_ptr);
@@ -122,7 +117,7 @@ static void chassis_filter_init(chassis_t* chassis_ptr)
  */
 static void chassis_pid_init(chassis_t* chassis_ptr)
 {
-    mf9025_set_pid(&chassis_ptr->mf9025, PARAM_9025_SPEED_PID, mf9025_speed_pid_config[0], mf9025_speed_pid_config[1], mf9025_speed_pid_config[2]);
+    mf9025_speed_init(chassis_ptr->mf9025, mf9025_speed_pid_config);
     PID_init(&chassis_ptr->ctrl.m9025_controller.pid, mf9025_angle_pid_config);
     for (int i = 0; i < 4; i++)
         PID_init(&chassis_ptr->ctrl.m3508_controller[i].pid, m3508_pid_config);
@@ -133,7 +128,7 @@ static void chassis_pid_init(chassis_t* chassis_ptr)
  */
 static uint8_t chassis_check_game_start(const chassis_t* chassis_ptr)
 {
-    return (chassis_ptr->referee.game_status.game_progress == 4);
+    return (chassis_ptr->referee->game_status.game_progress == 4);
 }
 
 /**
@@ -141,7 +136,7 @@ static uint8_t chassis_check_game_start(const chassis_t* chassis_ptr)
  */
 static void chassis_switch_controller(chassis_t* chassis_ptr)
 {
-    chassis_ptr->ctrl.chassis_controller = chassis_ptr->rc.rc_data.s1;
+    chassis_ptr->ctrl.chassis_controller = chassis_ptr->rc->rc_data.s1;
 }
 
 /**
@@ -155,17 +150,17 @@ static void chassis_calc_move_speed(chassis_t* chassis_ptr)
         chassis_ptr->ctrl.chassis_spin = 0;
         chassis_ptr->ctrl.gimbal_scan = 0;
 
-        vx = (fp32)chassis_ptr->rc.rc_data.ch3 * CHASSIS_MAX_V / RC_VAL_MAX;
-        vy = (fp32)chassis_ptr->rc.rc_data.ch2 * CHASSIS_MAX_V / RC_VAL_MAX;
-        vw = (fp32)chassis_ptr->rc.rc_data.ch1 * CHASSIS_MAX_V / RC_VAL_MAX;
+        vx = (fp32)chassis_ptr->rc->rc_data.ch3 * CHASSIS_MAX_V / RC_VAL_MAX;
+        vy = (fp32)chassis_ptr->rc->rc_data.ch2 * CHASSIS_MAX_V / RC_VAL_MAX;
+        vw = (fp32)chassis_ptr->rc->rc_data.ch1 * CHASSIS_MAX_V / RC_VAL_MAX;
     }
     else if (chassis_ptr->ctrl.chassis_controller == CHASSIS_UPC)
     {
-        chassis_ptr->ctrl.chassis_spin = chassis_ptr->nuc_ctrl.chassis_spin;
+        chassis_ptr->ctrl.chassis_spin = chassis_ptr->nuc_ctrl->chassis_spin;
 
-        vx = loop_float_constrain(chassis_ptr->nuc_ctrl.vx, -CHASSIS_MAX_V, CHASSIS_MAX_V);
-        vy = loop_float_constrain(chassis_ptr->nuc_ctrl.vy, -CHASSIS_MAX_V, CHASSIS_MAX_V);
-        vw = loop_float_constrain(chassis_ptr->nuc_ctrl.vw, -CHASSIS_MAX_V, CHASSIS_MAX_V);
+        vx = loop_float_constrain(chassis_ptr->nuc_ctrl->vx, -CHASSIS_MAX_V, CHASSIS_MAX_V);
+        vy = loop_float_constrain(chassis_ptr->nuc_ctrl->vy, -CHASSIS_MAX_V, CHASSIS_MAX_V);
+        vw = loop_float_constrain(chassis_ptr->nuc_ctrl->vw, -CHASSIS_MAX_V, CHASSIS_MAX_V);
 
         if (chassis_ptr->ctrl.chassis_spin)
             vw = SPIN_VW_SPEED;
@@ -205,16 +200,16 @@ static void chassis_calc_rotate_angle(chassis_t* chassis_ptr)
     {
         chassis_ptr->ctrl.gimbal_shutdown_flag = 0;
         chassis_ptr->ctrl.gimbal_scan = 0;
-        const fp32 yaw_delta = (fp32)chassis_ptr->rc.rc_data.ch0 * GIMBAL_ANGLE_DELTA_MAX / RC_VAL_MAX;
+        const fp32 yaw_delta = (fp32)chassis_ptr->rc->rc_data.ch0 * GIMBAL_ANGLE_DELTA_MAX / RC_VAL_MAX;
         chassis_ptr->ctrl.given_gimbal_l_yaw += yaw_delta;
     }
     else if (chassis_ptr->ctrl.chassis_controller == CHASSIS_UPC)
     {
         chassis_ptr->ctrl.gimbal_shutdown_flag = 0;
-        chassis_ptr->ctrl.gimbal_scan = chassis_ptr->nuc_ctrl.gimbal_scan;
+        chassis_ptr->ctrl.gimbal_scan = chassis_ptr->nuc_ctrl->gimbal_scan;
         if (chassis_ptr->ctrl.gimbal_scan)
-            chassis_ptr->nuc_ctrl.gimbal_yaw += GIMBAL_ANGLE_DELTA_MAX;
-        chassis_ptr->ctrl.given_gimbal_l_yaw = chassis_ptr->nuc_ctrl.gimbal_yaw;
+            chassis_ptr->nuc_ctrl->gimbal_yaw += GIMBAL_ANGLE_DELTA_MAX;
+        chassis_ptr->ctrl.given_gimbal_l_yaw = chassis_ptr->nuc_ctrl->gimbal_yaw;
     }
     else
     {
@@ -235,7 +230,7 @@ static void chassis_calc_angle(chassis_t* chassis_ptr)
     static float chassis_angle_temp[3] = {0.0f, 0.0f, 0.0f};
     static float gimbal_l_offset[3] = {0.0f, 0.0f, 0.0f};
 
-    memcpy(gimbal_l_ptr, chassis_ptr->cbord_chassis.imu_angle, sizeof(chassis_ptr->cbord_chassis.imu_angle));
+    memcpy(gimbal_l_ptr, chassis_ptr->cboard_chassis->imu_angle, sizeof(chassis_ptr->cboard_chassis->imu_angle));
     if (!gimbal_l_get_offset){
         gimbal_l_get_offset = 1;
         memcpy(gimbal_l_offset, gimbal_l_ptr, sizeof(gimbal_l_ptr));
@@ -243,8 +238,8 @@ static void chassis_calc_angle(chassis_t* chassis_ptr)
     else
         for (int i = 0; i < 3; i++) gimbal_l_ptr[i] -= gimbal_l_offset[i];
     Angle_Update(&chassis_ptr->gimbal_angle, gimbal_l_ptr);
-    yaw_diff = theta_format((fp32)(chassis_ptr->mf9025.ecd.ecd - chassis_ptr->mf9025.ecd.ecd_offset)/ MF9025_ECD_MAX * DEG_PER_CIRCLE);
-    zero_diff = theta_format((fp32)chassis_ptr->mf9025.ecd.zero_offset/ MF9025_ECD_MAX * DEG_PER_CIRCLE);
+    yaw_diff = theta_format((fp32)(chassis_ptr->mf9025->ecd.ecd - chassis_ptr->mf9025->ecd.ecd_offset)/ MF9025_ECD_MAX * DEG_PER_CIRCLE);
+    zero_diff = theta_format((fp32)chassis_ptr->mf9025->ecd.zero_offset/ MF9025_ECD_MAX * DEG_PER_CIRCLE);
     chassis_angle_temp[0] = theta_format(yaw_diff + gimbal_l_ptr[0] + zero_diff);
 
     Angle_Update(&chassis_ptr->chassis_angle, chassis_angle_temp);
@@ -297,9 +292,9 @@ static void chassis_calc_wheelmotor_speed(chassis_t* chassis_ptr)
  */
 static void chassis_calc_gimbalmotor_angle(chassis_t* chassis_ptr)
 {
-    BMI088_Read(&chassis_ptr->bmi088);
+    BMI088_Read();
     chassis_ptr->ctrl.m9025_controller.given_angle = chassis_ptr->ctrl.given_gimbal_l_yaw;
-    chassis_ptr->ctrl.m9025_controller.ff_speed = RAD_TO_DEG_FACTOR * chassis_ptr->bmi088.Gyro[2];
+    chassis_ptr->ctrl.m9025_controller.ff_speed = RAD_TO_DEG_FACTOR * chassis_ptr->bmi088->Gyro[2];
 }
 
 /**
@@ -309,7 +304,7 @@ static void chassis_calc_wheelmotor_pidout(chassis_t* chassis_ptr)
 {
     for (int i = 0; i < 4; i++)
     {
-        PID_calc(&chassis_ptr->ctrl.m3508_controller[i].pid, chassis_ptr->m3508.ecd[i].speed, chassis_ptr->ctrl.m3508_controller[i].given_speed);
+        PID_calc(&chassis_ptr->ctrl.m3508_controller[i].pid, chassis_ptr->m3508->ecd[i].speed, chassis_ptr->ctrl.m3508_controller[i].given_speed);
         chassis_ptr->ctrl.m3508_controller[i].out = chassis_ptr->ctrl.m3508_controller[i].pid.out[0];
     }
 }
@@ -323,44 +318,44 @@ static void chassis_calc_gimbalmotor_pidout(chassis_t* chassis_ptr)
  */
 static void chassis_set_max_power(chassis_t* chassis_ptr)
 {
-    chassis_ptr->ctrl.use_cap = chassis_ptr->nuc_ctrl.use_cap;
+    chassis_ptr->ctrl.use_cap = chassis_ptr->nuc_ctrl->use_cap;
     switch (chassis_ptr->ctrl.use_cap) // 该策略仅作联盟赛哨兵使用
     {
         case 0: // 常规情况，不使用超电
             chassis_ptr->ctrl.maxpower = sentinelMaxPower[0];
-            super_cap_use(&chassis_ptr->super_cap, 0);
+            super_cap_use(0);
             break;
         case 1: // ♿️冲刺♿️，使用超电抢占中心点
-            chassis_ptr->ctrl.maxpower = sentinelMaxPower[0] + chassis_ptr->super_cap.power_data.supercap_power;
-            super_cap_use(&chassis_ptr->super_cap, 1);
+            chassis_ptr->ctrl.maxpower = sentinelMaxPower[0] + chassis_ptr->super_cap->power_data.supercap_power;
+            super_cap_use(1);
             break;
         default:
             chassis_ptr->ctrl.maxpower = sentinelMaxPower[0];
-            super_cap_use(&chassis_ptr->super_cap, 0);
+            super_cap_use(0);
             break;
     }
-    if (chassis_ptr->super_cap.power_data.remain_v < REMAINPOWER_MIN) // 超电剩余能量过低时不使用超电
+    if (chassis_ptr->super_cap->power_data.remain_v < REMAINPOWER_MIN) // 超电剩余能量过低时不使用超电
     {
         chassis_ptr->ctrl.maxpower = sentinelMaxPower[0];
-        super_cap_use(&chassis_ptr->super_cap, 0);
+        super_cap_use(0);
     }
-    setMaxPower(&chassis_ptr->power_ctrl_config, chassis_ptr->ctrl.maxpower);
-    limitMaxPower(&chassis_ptr->power_ctrl_config, chassis_ptr->referee.power_heat_data.buffer_energy);
+    setMaxPower(chassis_ptr->ctrl.maxpower);
+    limitMaxPower(chassis_ptr->referee->power_heat_data.buffer_energy);
 }
 
 /**
  * @brief 将功率预测参数更新
  */
-static void chassis_update_power_param(chassis_t* chassis_ptr)
+static void chassis_update_power_param(const chassis_t* chassis_ptr)
 {
-    const float measuredpower = chassis_ptr->super_cap.power_data.total_power;
+    const float measuredpower = chassis_ptr->super_cap->power_data.total_power;
 
     float torque_feedback[4];
     float rpm_feedback[4];
 
     for (int i = 0; i < 4; i++) {
-        torque_feedback[i] = (float)chassis_ptr->m3508.ecd[i].current * M3508_CURRENT_LIMIT / M3508_ECD_MAX * TORQUE_TO_CURRENT_FACTOR;
-        rpm_feedback[i] = chassis_ptr->m3508.ecd[i].speed;
+        torque_feedback[i] = (float)chassis_ptr->m3508->ecd[i].current * M3508_CURRENT_LIMIT / M3508_ECD_MAX * TORQUE_TO_CURRENT_FACTOR;
+        rpm_feedback[i] = chassis_ptr->m3508->ecd[i].speed;
     }
 
     float effective_power = 0.0f;
@@ -369,10 +364,10 @@ static void chassis_update_power_param(chassis_t* chassis_ptr)
         effective_power += torque_feedback[i] * angular_velocity;
     }
 
-    PowerControl_CollectMotorData(&chassis_ptr->ctx, torque_feedback, rpm_feedback, measuredpower, 4);
-    PowerControl_Update(&chassis_ptr->ctx, effective_power);
+    PowerControl_CollectMotorData(torque_feedback, rpm_feedback, measuredpower, 4);
+    PowerControl_Update(effective_power);
 
-    updatePowerControlConfig(&chassis_ptr->power_ctrl_config, chassis_ptr->ctx.k2, chassis_ptr->ctx.k3);
+    updatePowerControlConfig(chassis_ptr->ctx->k2, chassis_ptr->ctx->k3);
 }
 
 /**
@@ -384,18 +379,18 @@ static void chassis_limit_power(chassis_t* chassis_ptr)
 
     for (int i = 0; i < 4; i++)
     {
-        motor_power[i].curAv = (fp32)chassis_ptr->m3508.ecd[i].speed * ECD_TO_AV;
+        motor_power[i].curAv = (fp32)chassis_ptr->m3508->ecd[i].speed * ECD_TO_AV;
         motor_power[i].setAv = (fp32)chassis_ptr->ctrl.m3508_controller[i].given_speed * ECD_TO_AV;
         motor_power[i].pidOutput = chassis_ptr->ctrl.m3508_controller[i].pid.out[0];
         motor_power[i].pidMaxOutput = chassis_ptr->ctrl.m3508_controller[i].pid.max_out;
     }
 
     MotorPowerObj *motors[4] = {&motor_power[0], &motor_power[1], &motor_power[2], &motor_power[3]};
-    allocatePowerWithLimit(motors, &chassis_ptr->power_ctrl_config, &chassis_ptr->power_ctrl_result);
+    allocatePowerWithLimit(motors);
 
     for (int i = 0; i < 4; i++)
     {
-        chassis_ptr->ctrl.m3508_controller[i].out = (int16_t)chassis_ptr->power_ctrl_result.newTorqueCurrent[i];
+        chassis_ptr->ctrl.m3508_controller[i].out = (int16_t)chassis_ptr->power_ctrl_result->newTorqueCurrent[i];
     }
 }
 
@@ -407,20 +402,20 @@ static void chassis_send_wheelmotor_cmd(const chassis_t* chassis_ptr)
     int16_t m3508_iq[4];
     for (int i = 0; i < 4; i++)
         m3508_iq[i] = (int16_t)chassis_ptr->ctrl.m3508_controller[i].out;
-    m3508_ctrl(&chassis_ptr->m3508, m3508_iq);
+    m3508_ctrl(chassis_ptr->m3508, m3508_iq);
 }
 static void chassis_send_gimbalmotor_cmd(const chassis_t* chassis_ptr)
 {
     const int32_t mf9025_speed_out = (int32_t)(chassis_ptr->ctrl.m9025_controller.pid.out[0] + chassis_ptr->ctrl.m9025_controller.ff_speed);
-    mf9025_ctrl_speed(&chassis_ptr->mf9025, MF9025_MAX_IQ, mf9025_speed_out);
+    mf9025_ctrl_speed(chassis_ptr->mf9025, MF9025_MAX_IQ, mf9025_speed_out);
 }
 
 static void chassis_send_referee_info(const chassis_t* chassis_ptr)
 {
-    const uint8_t game_start = chassis_ptr->referee.game_status.game_progress == 4 ? 1 : 0;
-    const uint8_t camp = (chassis_ptr->referee.robot_performance.robot_id > 100) ? 1 : 0;
-    const uint8_t attitude = (chassis_ptr->referee.sentry_info.sentry_info_2 >> 12) & 0x03;
-    const uint16_t shoot_heat = chassis_ptr->referee.power_heat_data.shooter_17mm_1_barrel_heat;
-    const uint16_t bullet_allow = chassis_ptr->referee.projectile_allowance.projectile_allowance_17mm;
-    CBoard_Referee_Tranmit(&chassis_ptr->cbord_chassis, game_start, camp, attitude, shoot_heat, bullet_allow);
+    const uint8_t game_start = chassis_ptr->referee->game_status.game_progress == 4 ? 1 : 0;
+    const uint8_t camp = (chassis_ptr->referee->robot_performance.robot_id > 100) ? 1 : 0;
+    const uint8_t attitude = (chassis_ptr->referee->sentry_info.sentry_info_2 >> 12) & 0x03;
+    const uint16_t shoot_heat = chassis_ptr->referee->power_heat_data.shooter_17mm_1_barrel_heat;
+    const uint16_t bullet_allow = chassis_ptr->referee->projectile_allowance.projectile_allowance_17mm;
+    CBoard_Referee_Tranmit(game_start, camp, attitude, shoot_heat, bullet_allow);
 }

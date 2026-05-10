@@ -19,7 +19,6 @@
 #define CHASSIS_MAX_W 8.0f // 底盘最大角速度 rad/s
 
 #define CHASSIS_CONTROL_TIME 0.003f // 控制周期 3ms
-#define DWT_CLOCK_FREQ 168 // DWT时钟频率 168MHz
 #define RAD_TO_DEG_FACTOR 5729.5779513f // 弧度转角度系数
 #define DEG_PER_CIRCLE 360.0f // 一圈的角度
 #define TORQUE_TO_CURRENT_FACTOR 0.3f // 扭矩转电流系数
@@ -82,17 +81,17 @@ typedef struct
 {
     ctrl_data_t ctrl; // 核心控制数据
 
-    rc_instance rc; // 遥控器实例
-    m3508_instance m3508; // 3508电机实例
-    mf9025_instance mf9025; // 9025电机实例
-    IMU_Data_t bmi088; // BMI088 IMU数据实例
-    PowerControllerConfig power_ctrl_config; // 功率控制配置
-    PowerAllocationResult power_ctrl_result; // 功率分配结果
-    PowerControlParam ctx; // 功率控制参数
-    super_cap_instance super_cap; // 超级电容实例
-    nuc_ctrl_t nuc_ctrl; // NUC控制实例
-    referee_t referee; // 裁判系统实例
-    cboard_chassis_t cbord_chassis; // 底盘通信实例
+    rc_instance *rc; // 遥控器实例
+    nuc_ctrl_t *nuc_ctrl; // NUC控制实例
+    referee_t *referee; // 裁判系统实例
+    super_cap_instance *super_cap; // 超级电容实例
+    cboard_chassis_t *cboard_chassis; // 底盘控制板通信实例
+    m3508_instance *m3508; // 3508电机实例
+    mf9025_instance *mf9025; // 9025电机实例
+    IMU_Data_t *bmi088; // BMI088 IMU数据实例
+    PowerControllerConfig *power_ctrl_config; // 功率控制配置
+    PowerAllocationResult *power_ctrl_result; // 功率分配结果
+    PowerControlParam *ctx; // 功率控制参数
 
     angle_t chassis_angle; // 底盘角度数据
     angle_t gimbal_angle; // 云台角度数据

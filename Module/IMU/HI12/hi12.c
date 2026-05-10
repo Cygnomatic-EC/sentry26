@@ -1,16 +1,17 @@
 #include "hi12.h"
-
+#include <string.h>
 #include "crc.h"
 
-void imuCallback(uint8_t* data, uint16_t len);
-static hi12_t* hi12_ins = NULL;
+static hi12_t hi12_instance;
 
-void HI12_Init(hi12_t* hi12_ptr, UART_HandleTypeDef* uart_handle)
+void imuCallback(uint8_t* data, uint16_t len);
+
+void HI12_Init(UART_HandleTypeDef* uart_handle)
 {
-    if (hi12_ptr == NULL || uart_handle == NULL)
+    if (uart_handle == NULL)
         return;
-    hi12_ins = hi12_ptr;
-    BSP_UART_Init(&hi12_ptr->imu_uart, uart_handle, 256000, imuCallback, NULL, 0, RX_BUFFER_SIZE);
+    BSP_UART_Init(&hi12_instance.imu_uart, uart_handle, 256000, imuCallback, NULL, 0, RX_BUFFER_SIZE);
+    hi12_instance.init = 1;
 }
 
 void imuCallback(uint8_t* data, const uint16_t len)
@@ -29,9 +30,14 @@ void imuCallback(uint8_t* data, const uint16_t len)
 
             if(crc == ((uint16_t)data[i+5]<<8 | data[i+4]))
             {
-                memcpy(&hi12_ins->imu_data, &data[i], sizeof(SensorDataPacket));
+                memcpy(&hi12_instance.imu_data, &data[i], sizeof(SensorDataPacket));
                 break;
             }
         }
     }
+}
+
+hi12_t *Get_HI12_Instance(void)
+{
+    return &hi12_instance;
 }

@@ -19,9 +19,11 @@ typedef struct
     uint8_t chassis_spin;
     uint8_t use_cap;
     uint32_t self_decision;
+    uint8_t init;
 } nuc_ctrl_t;
 
-void NUC_Init(nuc_ctrl_t* nuc_ptr, UART_HandleTypeDef *nuc_uart);
+void NUC_Init(UART_HandleTypeDef *nuc_uart);
+nuc_ctrl_t *Get_NUC_Ctrl_Instance(void);
 void NUC_Referee_Tran(const uint8_t* data, uint16_t len);
 
 #endif //STANDARD_ROBOT_C_NUC_H

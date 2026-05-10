@@ -25,8 +25,10 @@ typedef struct
 {
     UART_Instance_t imu_uart;
     SensorDataPacket imu_data;
+    uint8_t init;
 } hi12_t;
 
-void HI12_Init(hi12_t* hi12_ptr, UART_HandleTypeDef* uart_handle);
+void HI12_Init(UART_HandleTypeDef* uart_handle);
+hi12_t *Get_HI12_Instance(void);
 
 #endif //STANDARD_ROBOT_C_HI12_H

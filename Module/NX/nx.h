@@ -16,9 +16,11 @@ typedef struct
     uint8_t scan;
     fp32 target_yaw;
     fp32 target_pitch;
+    uint8_t init;
 } nx_ctrl_t;
 
-void NX_Init(nx_ctrl_t *nx_ctrl, CAN_HandleTypeDef *hcan);
-void NX_SendAngle(const nx_ctrl_t *nx_ctrl_ptr,const fp32 q[4]);
+void NX_Init(CAN_HandleTypeDef *hcan);
+void NX_SendAngle(const fp32 q[4]);
+nx_ctrl_t *Get_NX_Ctrl_Instance(void);
 
 #endif //STANDARD_ROBOT_C_NX_H

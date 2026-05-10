@@ -34,9 +34,11 @@ typedef struct
     uint8_t num;
     uint32_t txid;
     m2006_ecd_t ecd[4];
+    uint8_t init;
 }m2006_instance;
 
-M2006_Status_t m2006_init(m2006_instance* m2006_ins, CAN_HandleTypeDef *hcan, uint32_t txid, uint8_t num);
+M2006_Status_t m2006_init(CAN_HandleTypeDef *hcan, uint32_t txid, uint8_t num);
 M2006_Status_t m2006_ctrl(const m2006_instance* m2006_ins, int16_t current[4]);
+m2006_instance *Get_M2006_Ptr(uint16_t txid);
 
 #endif //STANDARD_ROBOT_C_M2006_H

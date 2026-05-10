@@ -18,13 +18,16 @@ typedef struct {
     // 采样数据
     Vector2 samples;         // 采样向量 [Σ|转速|, Σ扭矩²]
 
+    uint8_t init;             // 初始化标志
+
 } PowerControlParam;
 
-void PowerControl_Init(PowerControlParam* ctx);
-void PowerControl_Update(PowerControlParam* ctx, float effectivePower);
-void PowerControl_CollectMotorData(PowerControlParam* ctx, const float* torqueFeedback,
+void PowerControl_Init();
+void PowerControl_Update(float effectivePower);
+void PowerControl_CollectMotorData(const float* torqueFeedback,
     const float* rpmFeedback, float measuredPower, int motorCount);
-float* PowerControl_GetParam(const PowerControlParam* ctx);
-void PowerControl_ResetRLS(PowerControlParam* ctx);
+float* PowerControl_GetParam();
+void PowerControl_ResetRLS();
+PowerControlParam *Get_PowerControlParam_Ptr();
 
 #endif //NEW_CHASSIS_POWER_CTRL_PARAM_GET_H

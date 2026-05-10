@@ -372,10 +372,12 @@ typedef struct{
     mark_progress_t mark_progress;
     sentry_info_t sentry_info;
 
+    uint8_t init;
 }referee_t;
 
-void Referee_Init(referee_t *referee_ptr, UART_HandleTypeDef *referee_uart);
-void Referee_SendSentryCmd(const referee_t* referee_ptr, uint8_t progress_revive, uint8_t exchange_revive, uint16_t exchange_projectile, uint8_t remote_projectile_req, uint8_t remote_hp_req, uint8_t posture, uint8_t trigger_energy);
+void Referee_Init(UART_HandleTypeDef *referee_uart);
+referee_t *Get_Referee_Instance(void);
+void Referee_SendSentryCmd(uint8_t progress_revive, uint8_t exchange_revive, uint16_t exchange_projectile, uint8_t remote_projectile_req, uint8_t remote_hp_req, uint8_t posture, uint8_t trigger_energy);
 
 #if defined(_MSC_VER)
 #pragma pack(pop)

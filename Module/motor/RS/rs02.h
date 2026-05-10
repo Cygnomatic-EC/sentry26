@@ -4,6 +4,8 @@
 #include "typedef.h"
 #include "user_lib.h"
 
+#define RS02_CNT_MAX 5
+
 // 注意是将uint16_t[0, 65535]映射到[-RS02_ECD_MAX, RS02_ECD_MAX]，而不是[0, RS02_ECD_MAX], speed和torch同理
 #define RS02_UINT16_MAX 65535
 #define RS02_ECD_MAX (4*PI)
@@ -74,9 +76,10 @@ typedef struct
     rs02_ecd_t ecd;
     RS02_CTRL_MODE mode;
     RS02_PROTOCOL protocol;
+    uint8_t init;
 }rs02_instance;
 
-RS02_Status_t rs02_init(rs02_instance* rs02_ins, CAN_HandleTypeDef *hcan, uint8_t motorid,
+RS02_Status_t rs02_init(CAN_HandleTypeDef *hcan, uint8_t motorid,
     uint8_t masterid, uint8_t mode, uint8_t protocol);
 void rs02_change_masterid_mit(rs02_instance* rs02_ins, uint8_t masterid);
 void rs02_setmode_mit(const rs02_instance* rs02_ins, uint8_t mode);

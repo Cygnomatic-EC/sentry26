@@ -69,17 +69,19 @@ typedef struct
 typedef struct
 {
     gimbal_ctrl_t ctrl;
-    gm6020_instance angle_motor;
-    m2006_instance trigger_motor;
-    m3508_instance friction_motor;
-    cboard_gimbal_t cboard_gimbal;
-    nx_ctrl_t nx_ctrl;
-    rc_instance rc;
-    hi12_t hi12;
+    gm6020_instance* angle_motor;
+    m2006_instance* trigger_motor;
+    m3508_instance* friction_motor;
 
     angle_t angle;
+
+    cboard_gimbal_t* cboard;
+    nx_ctrl_t* nx_ctrl;
+    rc_instance* rc;
+    hi12_t* hi12;
 } gimbal_t;
 
+void Gimbal_Init(gimbal_t* gimbal_ptr);
 void Gimbal_Task(const void* argument);
 
 #endif //STANDARD_ROBOT_C_GIMBAL_H

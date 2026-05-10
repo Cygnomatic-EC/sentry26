@@ -49,11 +49,13 @@ typedef struct {
     float efficiency;          // 分配效率
 } PowerAllocationResult;
 
-void allocatePowerWithLimit(MotorPowerObj *objs[4], const PowerControllerConfig *config, PowerAllocationResult *result);
-void initPowerControllerConfig(PowerControllerConfig *config, float torqueConst, float currentLimit, float outputLimit,
+void allocatePowerWithLimit(MotorPowerObj *objs[4]);
+void initPowerControllerConfig(float torqueConst, float currentLimit, float outputLimit,
                                 float k1_init, float k2_init, float k3_init, float maxPower);
-void setMaxPower(PowerControllerConfig* config, float maxPower);
-uint8_t limitMaxPower(PowerControllerConfig * config, float buffer);
-void updatePowerControlConfig(PowerControllerConfig* config, float k2, float k3);
+void setMaxPower(float maxPower);
+uint8_t limitMaxPower(float buffer);
+void updatePowerControlConfig(float k2, float k3);
+PowerControllerConfig *Get_PowerControllerConfig_Ptr(void);
+PowerAllocationResult *Get_PowerAllocationResult_Ptr(void);
 
 #endif //NEW_CHASSIS_POWER_CTRL_H

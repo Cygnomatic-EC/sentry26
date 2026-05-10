@@ -21,9 +21,11 @@ typedef struct
 {
     CAN_Instance_t *can_ins;
     power_data_t power_data;
+    uint8_t init;
 } super_cap_instance;
 
-void super_cap_init(super_cap_instance* supercap_ins, CAN_HandleTypeDef *hcan);
-void super_cap_use(const super_cap_instance* supercap_ins, uint8_t use);
+void super_cap_init(CAN_HandleTypeDef *hcan);
+super_cap_instance *Get_SuperCap_Instance(void);
+void super_cap_use(uint8_t use);
 
 #endif //STANDARD_ROBOT_C_SUPER_CAP_H

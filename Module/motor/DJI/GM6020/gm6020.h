@@ -36,10 +36,12 @@ typedef struct
     uint8_t num;
     uint32_t txid;
     gm6020_ecd_t ecd[4];
+    uint8_t init;
 }gm6020_instance;
 
-GM6020_Status_t gm6020_init(gm6020_instance* gm6020_ins, CAN_HandleTypeDef *hcan, uint32_t txid, uint8_t num);
+GM6020_Status_t gm6020_init(CAN_HandleTypeDef *hcan, uint32_t txid, uint8_t num);
 GM6020_Status_t gm6020_ctrl_voltage(const gm6020_instance* gm6020_ins, int16_t voltage[4]);
 GM6020_Status_t gm6020_ctrl_current(const gm6020_instance* gm6020_ins, int16_t current[4]);
+gm6020_instance *Get_GM6020_Ptr(uint16_t txid);
 
 #endif //STANDARD_ROBOT_C_GM6020_H

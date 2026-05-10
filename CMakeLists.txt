@@ -79,6 +79,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         Module/LED/led.c
         Module/VOFA/vofa.c
         APP/task_init.c
+        APP/module_init.c
         APP/chassis.c
         APP/gimbal.c
         APP/daemon.c
@@ -99,8 +100,7 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
         ARM_MATH_CM4;ARM_MATH_MATRIX_CHECK;ARM_MATH_ROUNDING
         MADE_BY_CMAKE
 
-        CHASSIS
-        #GIMBAL
+        #CHASSIS
         OMNI
 )
 

@@ -1,34 +1,45 @@
 // FUCK 灵足
 #include "rs02.h"
 
+static rs02_instance rs02[RS02_CNT_MAX];
+
 void get_rs02_measure_mit(const uint8_t* rx_data, uint32_t id, void* arg);
 void get_rs02_measure_private(const uint8_t* rx_data, uint32_t id, void* arg);
-RS02_Status_t rs02_init(rs02_instance* rs02_ins, CAN_HandleTypeDef *hcan, const uint8_t motorid, const uint8_t masterid,
-    const uint8_t mode, const uint8_t protocol)
+RS02_Status_t rs02_init(CAN_HandleTypeDef *hcan, const uint8_t motorid, const uint8_t masterid, const uint8_t mode, const uint8_t protocol)
 {
-    rs02_ins->can_ins = BSP_CAN_Init(hcan);
-    rs02_ins->motorid = motorid;
-    rs02_ins->masterid = masterid;
-    rs02_ins->protocol = protocol;
+    uint8_t index = 0;
+    while (index < RS02_CNT_MAX)
+    {
+        if (rs02[index].init && rs02[index].motorid == motorid)
+            return RS02_ALREADY_INITIALIZED;
+        if (!rs02[index].init)
+            break;
+        index++;
+    }
+
+    rs02[index].can_ins = BSP_CAN_Init(hcan);
+    rs02[index].motorid = motorid;
+    rs02[index].masterid = masterid;
+    rs02[index].protocol = protocol;
 
     if (protocol == RS02_PROTOCOL_MIT)
     {
         // 这个主机id的设置莫名其妙，MIT协议下回调函数的接收id是主机id而不是电机id
         // 和bsp_can的代码相矛盾，所以我打算改为一个电机id对应一个主机id
-        rs02_change_masterid_mit(rs02_ins, masterid);
-        BSP_CAN_RegisterStdCallback(rs02_ins->can_ins, masterid, get_rs02_measure_mit, &rs02_ins->ecd);
-        rs02_setmode_mit(rs02_ins, mode); // 还有超绝必须先设置模式再使能，又要连发两条can
+        rs02_change_masterid_mit(&rs02[index], masterid);
+        BSP_CAN_RegisterStdCallback(rs02[index].can_ins, masterid, get_rs02_measure_mit, &rs02[index].ecd);
+        rs02_setmode_mit(&rs02[index], mode); // 还有超绝必须先设置模式再使能，又要连发两条can
         osDelay(1);
-        rs02_enable_mit(rs02_ins);
+        rs02_enable_mit(&rs02[index]);
         osDelay(1);
     }
     else if (protocol == RS02_PROTOCOL_PRIVATE)
     {
         // 主机id默认是0xFD
         // 私有协议用扩展can，所有控制指令都通过写入参数实现，除了运控模式一个控制指令需要发两个can，不知道这sb电机的通信协议是怎么设计的
-        rs02_set_mitctrl_private(rs02_ins); // 依旧先设置模式再使能
-        BSP_CAN_RegisterExtCallback(rs02_ins->can_ins, ((RS02_CMD_CALLBACK << 24) | (masterid << 8) | motorid), 0x00FFFFFF, get_rs02_measure_private, &rs02_ins->ecd);
-        rs02_enable_private(rs02_ins);
+        rs02_set_mitctrl_private(&rs02[index]); // 依旧先设置模式再使能
+        BSP_CAN_RegisterExtCallback(rs02[index].can_ins, ((RS02_CMD_CALLBACK << 24) | (masterid << 8) | motorid), 0x00FFFFFF, get_rs02_measure_private, &rs02[index].ecd);
+        rs02_enable_private(&rs02[index]);
     }
     return RS02_OK;
 }

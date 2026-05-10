@@ -1,22 +1,24 @@
 #include "gm6020.h"
-
 #include "user_lib.h"
 
+static gm6020_instance gm6020[2];
+
 void get_gm6020_measure(const uint8_t* rx_data, uint32_t id, void* arg);
-GM6020_Status_t gm6020_init(gm6020_instance* gm6020_ins, CAN_HandleTypeDef *hcan, const uint32_t txid, const uint8_t num)
+GM6020_Status_t gm6020_init(CAN_HandleTypeDef *hcan, const uint32_t txid, const uint8_t num)
 {
     if (txid == GM6020_TX_1 || txid == GM6020_TX_2)
     {
-        gm6020_ins->can_ins = BSP_CAN_Init(hcan);
-        gm6020_ins->num = num;
-        gm6020_ins->txid = txid;
+        const uint8_t index = (txid == GM6020_TX_1) ? 0 : 1;
+        gm6020[index].can_ins = BSP_CAN_Init(hcan);
+        gm6020[index].num = num;
+        gm6020[index].txid = txid;
 
         if (txid == GM6020_TX_1)
         {
             if (num > GM6020_MAXNUM_1)
                 return GM6020_ERROR_INVALID_PARAM;
             for (uint8_t i = 0; i < num; i++){
-                BSP_CAN_RegisterStdCallback(gm6020_ins->can_ins, GM6020_RX_1+i, get_gm6020_measure, &gm6020_ins->ecd[i]);
+                BSP_CAN_RegisterStdCallback(gm6020[index].can_ins, GM6020_RX_1+i, get_gm6020_measure, &gm6020[index].ecd[i]);
             }
         }
         else
@@ -24,9 +26,10 @@ GM6020_Status_t gm6020_init(gm6020_instance* gm6020_ins, CAN_HandleTypeDef *hcan
             if (num > GM6020_MAXNUM_2)
                 return GM6020_ERROR_INVALID_PARAM;
             for (uint8_t i = 0; i < num; i++){
-                BSP_CAN_RegisterStdCallback(gm6020_ins->can_ins, GM6020_RX_2+i, get_gm6020_measure, &gm6020_ins->ecd[i]);
+                BSP_CAN_RegisterStdCallback(gm6020[index].can_ins, GM6020_RX_2+i, get_gm6020_measure, &gm6020[index].ecd[i]);
             }
         }
+        gm6020[index].init = 1;
         return GM6020_OK;
     }
     return GM6020_ERROR_INVALID_PARAM;
@@ -34,7 +37,7 @@ GM6020_Status_t gm6020_init(gm6020_instance* gm6020_ins, CAN_HandleTypeDef *hcan
 
 GM6020_Status_t gm6020_ctrl_voltage(const gm6020_instance* gm6020_ins, int16_t voltage[4])
 {
-    if (gm6020_ins == NULL)
+    if (gm6020_ins == NULL || !gm6020_ins->init)
         return GM6020_ERROR;
 
     const CAN_Instance_t* can_ins = gm6020_ins->can_ins;
@@ -53,7 +56,7 @@ GM6020_Status_t gm6020_ctrl_voltage(const gm6020_instance* gm6020_ins, int16_t v
 
 GM6020_Status_t gm6020_ctrl_current(const gm6020_instance* gm6020_ins, int16_t current[4])
 {
-    if (gm6020_ins == NULL)
+    if (gm6020_ins == NULL || !gm6020_ins->init)
         return GM6020_ERROR;
 
     const CAN_Instance_t* can_ins = gm6020_ins->can_ins;
@@ -81,4 +84,14 @@ void get_gm6020_measure(const uint8_t* rx_data, uint32_t id, void* arg)
     ecd->speed = (int16_t)((rx_data)[2] << 8 | (rx_data)[3]);
     ecd->current = (int16_t)((rx_data)[4] << 8 | (rx_data)[5]);
     ecd->temperature = (rx_data)[6];
+}
+
+gm6020_instance *Get_GM6020_Ptr(const uint16_t txid)
+{
+    if (txid == GM6020_TX_1)
+        return &gm6020[0];
+    if (txid == GM6020_TX_2)
+        return &gm6020[1];
+
+    return NULL;
 }

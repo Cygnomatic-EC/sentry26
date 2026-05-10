@@ -1,14 +1,26 @@
 #include "mf9025.h"
 #include "user_lib.h"
 
+static mf9025_instance mf9025[MF9025_CNT_MAX];
+
 void mf9025_callback(const uint8_t* rx_data, uint32_t id, void* arg);
-MF9025_Status_t mf9025_init(mf9025_instance* mf9025_ins, CAN_HandleTypeDef *hcan, const uint32_t txid)
+MF9025_Status_t mf9025_init(CAN_HandleTypeDef *hcan, const uint32_t txid)
 {
+    uint8_t index = 0;
     if (txid < MF9025_TX_MIN || txid > MF9025_TX_MAX)
         return MF9025_ERROR_INVALID_PARAM;
-    mf9025_ins->can_ins = BSP_CAN_Init(hcan);
-    mf9025_ins->txid = txid;
-    BSP_CAN_RegisterStdCallback(mf9025_ins->can_ins, txid, mf9025_callback, &mf9025_ins->ecd);
+    while (index < MF9025_CNT_MAX)
+    {
+        if (mf9025[index].init && mf9025[index].txid == txid)
+            return MF9025_ALREADY_INITIALIZED;
+        if (!mf9025[index].init)
+            break;
+        index++;
+    }
+    mf9025[index].can_ins = BSP_CAN_Init(hcan);
+    mf9025[index].txid = txid;
+    BSP_CAN_RegisterStdCallback(mf9025[index].can_ins, txid, mf9025_callback, &mf9025[index].ecd);
+    mf9025[index].init = 1;
     return MF9025_OK;
 }
 
@@ -139,4 +151,14 @@ void get_mf9025_ecd(const uint8_t* rx_data, void* arg)
         ecd->ecd_offset = ecd->ecd;
         ecd->zero_offset = (ecd->ecd > MF9025_ECD_IN_ZERO) ? (ecd->ecd - MF9025_ECD_IN_ZERO) : (ecd->ecd + MF9025_ECD_MAX - MF9025_ECD_IN_ZERO);
     }
+}
+
+mf9025_instance *Get_MF9025_Ptr(const uint32_t txid)
+{
+    for (uint8_t i = 0; i < MF9025_CNT_MAX; i++)
+    {
+        if (mf9025[i].init && mf9025[i].txid == txid)
+            return &mf9025[i];
+    }
+    return NULL;
 }

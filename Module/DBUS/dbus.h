@@ -26,7 +26,7 @@
 #define DBUS_MAX_LEN     (36)
 #define DBUS_BUFLEN      (18)
 #define DBUS_HUART       huart3
-#define DBUS_RXID        0x602
+#define DBUS_CANID        0x600
 
 typedef enum
 {
@@ -50,8 +50,11 @@ typedef struct
     rc_data_t rc_data;
     UART_Instance_t dbus_usart;
     CAN_Instance_t* dbus_can;
+    uint8_t init;
 } rc_instance;
 
-void dbus_init(rc_instance* rc_ins, RC_MODE mode, CAN_HandleTypeDef* hcan);
+void dbus_init(RC_MODE mode, CAN_HandleTypeDef* hcan);
+void RemoteData_UART2CAN();
+rc_instance *Get_DBUS_Instance(void);
 
 #endif //STANDARD_ROBOT_C_DBUS_H

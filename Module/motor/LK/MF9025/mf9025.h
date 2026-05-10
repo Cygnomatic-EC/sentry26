@@ -3,6 +3,8 @@
 #include "can/bsp_can.h"
 #include "typedef.h"
 
+#define MF9025_CNT_MAX 5
+
 #define MF9025_TX_MIN 0x141
 #define MF9025_TX_MAX 0x160
 
@@ -54,12 +56,14 @@ typedef struct
     CAN_Instance_t *can_ins;
     uint32_t txid;
     mf9025_ecd_t ecd;
+    uint8_t init;
 }mf9025_instance;
 
-MF9025_Status_t mf9025_init(mf9025_instance* mf9025_ins, CAN_HandleTypeDef *hcan, uint32_t txid);
+MF9025_Status_t mf9025_init(CAN_HandleTypeDef *hcan, uint32_t txid);
 void mf9025_speed_init(const mf9025_instance* mf9025_ins, const uint16_t pid_v[3]);
 MF9025_Status_t mf9025_ctrl_speed(const mf9025_instance* mf9025_ins, uint16_t iqControl, uint32_t speedControl);
 MF9025_Status_t mf9025_set_pid(const mf9025_instance* mf9025_ins, uint8_t param, uint16_t kp, uint16_t ki, uint16_t kd);
 MF9025_Status_t mf9025_get_measure(const mf9025_instance* mf9025_ins);
+mf9025_instance *Get_MF9025_Ptr(uint32_t txid);
 
 #endif //STANDARD_ROBOT_C_MF9025_H

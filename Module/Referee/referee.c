@@ -1,19 +1,18 @@
 #include "Referee/referee.h"
-#include <string.h>
 #include "crc.h"
 #include "usart.h"
 #include "NUC/nuc.h"
+#include <string.h>
 
-static referee_t* referee_ins;
+static referee_t referee_instance;
 
 void Referee_RxCallback(uint8_t* data, uint16_t len);
-void Referee_Init(referee_t *referee_ptr, UART_HandleTypeDef *referee_uart)
+void Referee_Init(UART_HandleTypeDef *referee_uart)
 {
-    if (referee_ptr == NULL)
-        return;
+    referee_t *referee_ptr = &referee_instance;
     memset(referee_ptr, 0, sizeof(referee_t));
-    referee_ins = referee_ptr;
     BSP_UART_Init(&referee_ptr->uart_instance, referee_uart, 115200, Referee_RxCallback, NULL, 0, RX_BUFFER_SIZE);
+    referee_instance.init = 1;
 }
 
 void Referee_RxCallback(uint8_t* data, const uint16_t len)
@@ -46,58 +45,58 @@ void Referee_RxCallback(uint8_t* data, const uint16_t len)
             switch (cmd_id)
             {
             case CMD_ID_GAME_STATUS:
-                memcpy(&referee_ins->game_status, &rx_data[7], sizeof(game_status_t));
+                memcpy(&referee_instance.game_status, &rx_data[7], sizeof(game_status_t));
                 break;
             case CMD_ID_GAME_RESULT:
-                memcpy(&referee_ins->game_result, &rx_data[7], sizeof(game_result_t));
+                memcpy(&referee_instance.game_result, &rx_data[7], sizeof(game_result_t));
                 break;
             case CMD_ID_GAME_ROBOT_HP:
-                memcpy(&referee_ins->game_robot_hp, &rx_data[7], sizeof(game_robot_HP_t));
+                memcpy(&referee_instance.game_robot_hp, &rx_data[7], sizeof(game_robot_HP_t));
                 break;
             case CMD_ID_EVENT_DATA:
-                memcpy(&referee_ins->event_data, &rx_data[7], sizeof(event_data_t));
+                memcpy(&referee_instance.event_data, &rx_data[7], sizeof(event_data_t));
                 break;
             case CMD_ID_REFEREE_WARNING:
-                memcpy(&referee_ins->referee_warning, &rx_data[7], sizeof(referee_warning_t));
+                memcpy(&referee_instance.referee_warning, &rx_data[7], sizeof(referee_warning_t));
                 break;
             case CMD_ID_DART_INFO:
-                memcpy(&referee_ins->dart_info, &rx_data[7], sizeof(dart_info_t));
+                memcpy(&referee_instance.dart_info, &rx_data[7], sizeof(dart_info_t));
                 break;
             case CMD_ID_ROBOT_PERFORMANCE:
-                memcpy(&referee_ins->robot_performance, &rx_data[7], sizeof(robot_performance_t));
+                memcpy(&referee_instance.robot_performance, &rx_data[7], sizeof(robot_performance_t));
                 break;
             case CMD_ID_POWER_HEAT_DATA:
-                memcpy(&referee_ins->power_heat_data, &rx_data[7], sizeof(power_heat_data_t));
+                memcpy(&referee_instance.power_heat_data, &rx_data[7], sizeof(power_heat_data_t));
                 break;
             case CMD_ID_ROBOT_POS:
-                memcpy(&referee_ins->robot_pos, &rx_data[7], sizeof(robot_pos_t));
+                memcpy(&referee_instance.robot_pos, &rx_data[7], sizeof(robot_pos_t));
                 break;
             case CMD_ID_BUFF_DATA:
-                memcpy(&referee_ins->buff_data, &rx_data[7], sizeof(buff_data_t));
+                memcpy(&referee_instance.buff_data, &rx_data[7], sizeof(buff_data_t));
                 break;
             case CMD_ID_HURT_DATA:
-                memcpy(&referee_ins->hurt_data, &rx_data[7], sizeof(hurt_data_t));
+                memcpy(&referee_instance.hurt_data, &rx_data[7], sizeof(hurt_data_t));
                 break;
             case CMD_ID_SHOOT_DATA:
-                memcpy(&referee_ins->shoot_data, &rx_data[7], sizeof(shoot_data_t));
+                memcpy(&referee_instance.shoot_data, &rx_data[7], sizeof(shoot_data_t));
                 break;
             case CMD_ID_PROJECTILE_ALLOWANCE:
-                memcpy(&referee_ins->projectile_allowance, &rx_data[7], sizeof(projectile_allowance_t));
+                memcpy(&referee_instance.projectile_allowance, &rx_data[7], sizeof(projectile_allowance_t));
                 break;
             case CMD_ID_RFID_STATUS:
-                memcpy(&referee_ins->rfid_status, &rx_data[7], sizeof(rfid_status_t));
+                memcpy(&referee_instance.rfid_status, &rx_data[7], sizeof(rfid_status_t));
                 break;
             case CMD_ID_DART_CLIENT_CMD:
-                memcpy(&referee_ins->dart_client_cmd, &rx_data[7], sizeof(dart_client_cmd_t));
+                memcpy(&referee_instance.dart_client_cmd, &rx_data[7], sizeof(dart_client_cmd_t));
                 break;
             case CMD_ID_ROBOT_POS_EXT:
-                memcpy(&referee_ins->robot_pos_ext, &rx_data[7], sizeof(robot_pos_ext_t));
+                memcpy(&referee_instance.robot_pos_ext, &rx_data[7], sizeof(robot_pos_ext_t));
                 break;
             case CMD_ID_MARK_PROGRESS:
-                memcpy(&referee_ins->mark_progress, &rx_data[7], sizeof(mark_progress_t));
+                memcpy(&referee_instance.mark_progress, &rx_data[7], sizeof(mark_progress_t));
                 break;
             case CMD_ID_SENTRY_INFO:
-                memcpy(&referee_ins->sentry_info, &rx_data[7], sizeof(sentry_info_t));
+                memcpy(&referee_instance.sentry_info, &rx_data[7], sizeof(sentry_info_t));
                 break;
                 // case CMD_ID_RADAR_INFO :
                 //     memcpy(&referee_ins.radar_info, &rx_data[7], sizeof(radar_info_t));
@@ -110,7 +109,7 @@ void Referee_RxCallback(uint8_t* data, const uint16_t len)
     }
 }
 
-void RefereeCmd_PackPacket(const referee_t* referee_ptr, const uint8_t *data_in, const uint16_t data_len, const uint16_t cmd_id)
+void RefereeCmd_PackPacket(const uint8_t *data_in, const uint16_t data_len, const uint16_t cmd_id)
 {
     const uint16_t total_len = FRAME_HEADER_LEN + CMD_ID_LEN + data_len + 2;
     uint8_t data_out[total_len];
@@ -130,11 +129,10 @@ void RefereeCmd_PackPacket(const referee_t* referee_ptr, const uint8_t *data_in,
     Append_CRC8_Check_Sum(data_out, FRAME_HEADER_LEN);
     Append_CRC16_Check_Sum(data_out, total_len);
 
-    BSP_UART_Transmit_To_Mail(&referee_ptr->uart_instance, data_out, sizeof(data_out), 100);
+    BSP_UART_Transmit_To_Mail(&referee_instance.uart_instance, data_out, sizeof(data_out), 100);
 }
 
-void Referee_SendSentryCmd(const referee_t* referee_ptr,
-    const uint8_t progress_revive, // 读条复活
+void Referee_SendSentryCmd(const uint8_t progress_revive, // 读条复活
     const uint8_t exchange_revive, // 兑换复活
     const uint16_t exchange_projectile, // 兑换发弹量
     const uint8_t remote_projectile_req, // 兑换发弹量的请求次数
@@ -143,23 +141,22 @@ void Referee_SendSentryCmd(const referee_t* referee_ptr,
     const uint8_t trigger_energy // 是否确认使能量机关进入正在激活状态
     )
 {
+    if (!referee_instance.init)
+        return;
     sentry_cmd_t sentry_cmd = {0};
 
-    // bit 0
     if (progress_revive) sentry_cmd.sentry_cmd |= (1 << 0);
-    // bit 1
     if (exchange_revive) sentry_cmd.sentry_cmd |= (1 << 1);
-    // bit 2-12 (11 bits)
     sentry_cmd.sentry_cmd |= ((uint32_t)(exchange_projectile & 0x7FF) << 2);
-    // bit 13-16 (4 bits)
     sentry_cmd.sentry_cmd |= ((uint32_t)(remote_projectile_req & 0xF) << 13);
-    // bit 17-20 (4 bits)
     sentry_cmd.sentry_cmd |= ((uint32_t)(remote_hp_req & 0xF) << 17);
-    // bit 21-22 (2 bits)
     sentry_cmd.sentry_cmd |= ((uint32_t)(posture & 0x3) << 21);
-    // bit 23 (1 bit)
     if (trigger_energy) sentry_cmd.sentry_cmd |= (1 << 23);
-    // bit 24-31 are reserved and default to 0
 
-    RefereeCmd_PackPacket(referee_ptr, (uint8_t*)&sentry_cmd, sizeof(sentry_cmd), CMD_ID_SENTRY_SELFDECISION);
+    RefereeCmd_PackPacket((uint8_t*)&sentry_cmd, sizeof(sentry_cmd), CMD_ID_SENTRY_SELFDECISION);
+}
+
+referee_t *Get_Referee_Instance(void)
+{
+    return &referee_instance;
 }
