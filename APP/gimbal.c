@@ -2,9 +2,9 @@
 #include "can.h"
 #include "usart.h"
 
-const pid_config yaw_pid_config = {.mode = PID_POSITION, .kp = 500.0f, .ki = 0.0f, .kd = 10.0f, .max_out = 25000.0f, .max_iout = 3000.0f,
+const pid_config yaw_pid_config = {.mode = PID_POSITION, .kp = 1500.0f, .ki = 0.0f, .kd = 100.0f, .max_out = 25000.0f, .max_iout = 3000.0f,
     .out_limit_delta_P = 1000.0f, .out_limit_delta_N = 4000.0f, .deadzone = 0.0f};
-const pid_config pitch_pid_config = {.mode = PID_POSITION, .kp = 500.0f, .ki = 0.0f, .kd = 200.0f, .max_out = 25000.0f, .max_iout = 3000.0f,
+const pid_config pitch_pid_config = {.mode = PID_POSITION, .kp = 1500.0f, .ki = 0.0f, .kd = 200.0f, .max_out = 25000.0f, .max_iout = 3000.0f,
     .out_limit_delta_P = 1000.0f, .out_limit_delta_N = 4000.0f, .deadzone = 0.0f};
 const pid_config friction_pid_config = {.mode = PID_POSITION, .kp = 8.0f, .ki = 0.0f, .kd = 0.0f, .max_out = 16000.0f, .max_iout = 3000.0f,
     .out_limit_delta_P = 1000.0f, .out_limit_delta_N = 4000.0f, .deadzone = 0.0f};
@@ -107,7 +107,7 @@ static void gimbal_calc_target_angle(gimbal_t* gimbal_ptr)
     switch (gimbal_ptr->ctrl.gimbal_controller)
     {
         case GIMBAL_RC:
-            gimbal_ptr->ctrl.target_yaw += (fp32)gimbal_ptr->rc.rc_data.ch0 * SMALL_GIMBAL_ANGLE_DELTA_MAX / RC_VAL_MAX;
+            gimbal_ptr->ctrl.target_yaw -= (fp32)gimbal_ptr->rc.rc_data.ch0 * SMALL_GIMBAL_ANGLE_DELTA_MAX / RC_VAL_MAX;
             gimbal_ptr->ctrl.target_pitch += (fp32)gimbal_ptr->rc.rc_data.ch1 * SMALL_GIMBAL_ANGLE_DELTA_MAX / RC_VAL_MAX;
             gimbal_ptr->ctrl.fire = (gimbal_ptr->rc.rc_data.roll >= 600) ? 1 : 0;
             gimbal_ptr->ctrl.open_friction = (gimbal_ptr->rc.rc_data.s2 == 2) ? 1 : 0;

@@ -58,11 +58,11 @@ DM8009P_Status_t dm8009p_ctrl_mit(const dm8009p_instance_t *ins,
     if (kp < 0 || kp > DM8009P_KP_MAX || kd < 0 || kd > DM8009P_KD_MAX)
         return DM8009P_ERROR_INVALID_PARAM;
 
-    uint16_t p_raw = (uint16_t)((p_des / DM8009P_POS_FACTOR) + 32768);
-    uint16_t v_raw = (uint16_t)((v_des / DM8009P_VEL_FACTOR) + 2048);
-    uint8_t  kp_raw = (uint8_t)(kp * 255.0f / DM8009P_KP_MAX);
-    uint16_t kd_raw = (uint16_t)(kd * 4095.0f / DM8009P_KD_MAX);
-    uint8_t  t_raw = (uint8_t)((t_ff / DM8009P_TORQUE_FACTOR) + 128);
+    const uint16_t p_raw = (uint16_t)((p_des / DM8009P_POS_FACTOR) + 32768);
+    const uint16_t v_raw = (uint16_t)((v_des / DM8009P_VEL_FACTOR) + 2048);
+    const uint8_t  kp_raw = (uint8_t)(kp * 255.0f / DM8009P_KP_MAX);
+    const uint16_t kd_raw = (uint16_t)(kd * 4095.0f / DM8009P_KD_MAX);
+    const uint8_t  t_raw = (uint8_t)((t_ff / DM8009P_TORQUE_FACTOR) + 128);
 
     uint8_t txdata[8];
     txdata[0] = (uint8_t)(p_raw >> 8);

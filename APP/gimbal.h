@@ -11,14 +11,14 @@
 #include "DBUS/dbus.h"
 #include "IMU/HI12/hi12.h"
 
-#define SMALL_GIMBAL_ANGLE_DELTA_MAX 0.04f
+#define SMALL_GIMBAL_ANGLE_DELTA_MAX 0.08f
 #define TRIGGER_SPEED_MAX 1000
 #define FRICTION_SPEED_MAX 10000
 #define FRICTION_READY_SPEED 3000
 #define YAW_LIMIT 30.0f
 #define PITCH_LIMIT 20.0f
-#define ECD_YAW_OFFSET 180.0f
-#define ECD_PITCH_OFFSET 60.0f
+#define ECD_YAW_OFFSET 60.0f
+#define ECD_PITCH_OFFSET 180.0f
 
 typedef enum
 {
