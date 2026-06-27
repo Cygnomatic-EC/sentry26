@@ -1,5 +1,4 @@
 #include "vofa.h"
-
 #include "user_lib.h"
 
 void vofacallback(uint8_t* data, uint16_t len);
@@ -19,7 +18,7 @@ void vofa_init(vofa_t* vofa, UART_HandleTypeDef* huart, const uint16_t txnum, co
 
 void vofacallback(uint8_t* data, uint16_t len)
 {
-    const uint16_t rxlen = vofa_ptr->rx_num * sizeof(fp32);
+    const uint16_t rxlen = sizeof(fp32);
     if(data[0] != PARAM_HEADER || data[3] != 0 || data[4] != 0x5A)
         return ;
     if(data[1] != rxlen)
@@ -42,11 +41,11 @@ void vofacallback(uint8_t* data, uint16_t len)
     }
 }
 
-void vofa_print(const vofa_t* vofa, const fp32* data)
+void vofa_print(vofa_t* vofa, const fp32* data)
 {
     const uint8_t tail[4] = {0x00, 0x00, 0x80, 0x7F};
     uint8_t txdata[vofa->tx_num * sizeof(fp32) + 4];
     memcpy(txdata, data, vofa->tx_num * sizeof(fp32));
     memcpy(txdata + vofa->tx_num * sizeof(fp32), tail, 4);
-    BSP_UART_Transmit_To_Mail(&vofa->vofa_uart, (uint8_t*)txdata, vofa->tx_num * sizeof(fp32) + 4, 100);
+    BSP_UART_Transmit(&vofa->vofa_uart, (uint8_t*)txdata, vofa->tx_num * sizeof(fp32) + 4, 100);
 }

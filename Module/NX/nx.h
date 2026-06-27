@@ -8,7 +8,7 @@ typedef enum
     CMD_ID_POS_CTRL = 0x400,
     CMD_ID_POS_CTRL_FIRE = 0x401,
     CMD_ID_POS_INFO = 0x501,
-    CMD_ID_PITCH_INFO = 0x502,
+    CMD_ID_VEC_INFO = 0x502,
 } nx_cmd_id_t;
 
 typedef struct
@@ -21,8 +21,7 @@ typedef struct
 } nx_ctrl_t;
 
 void NX_Init(nx_ctrl_t *nx_ctrl, CAN_HandleTypeDef *hcan);
-// void NX_SendPos(const nx_ctrl_t *nx_ctrl_ptr, fp32 x, fp32 y, fp32 yaw);
-// void NX_SendPitch(const nx_ctrl_t *nx_ctrl_ptr, fp32 pitch);
 void NX_SendPos(const nx_ctrl_t *nx_ctrl_ptr, fp32 x, fp32 y, fp32 yaw, fp32 pitch);
+void NX_SendVec(const nx_ctrl_t *nx_ctrl_ptr, fp32 vx, fp32 vy);
 
 #endif //STANDARD_ROBOT_C_NX_H

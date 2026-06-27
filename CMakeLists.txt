@@ -62,22 +62,14 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         Module/motor/LK/MF9025/mf9025.c
         Module/motor/RS/rs02.c
         Module/DBUS/dbus.c
-        Module/NUC/nuc.c
         Module/NX/nx.c
         Module/Odom/odom.c
-        Module/Referee/referee.c
-        Module/COMM/comm.c
-        Module/COMM/CBoard_chassis.c
-        Module/COMM/CBoard_gimbal.c
+        Module/VOFA/vofa.c
         Module/IMU/BMI088/BMI088Middleware.c
         Module/IMU/BMI088/BMI088driver.c
         Module/IMU/EKF/kalman_filter.c
         Module/IMU/EKF/QuaternionEKF.c
         Module/IMU/INS/ins.c
-        Module/IMU/HI12/hi12.c
-        Module/Super_Cap/super_cap.c
-        Module/Power_Ctrl/power_ctrl.c
-        Module/Power_Ctrl/power_ctrl_param_get.c
         Module/LED/led.c
         APP/task_init.c
         APP/robovolley.c

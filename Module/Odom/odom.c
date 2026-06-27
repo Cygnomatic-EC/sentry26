@@ -1,13 +1,15 @@
 #include "odom.h"
 #include "crc.h"
+#include "user_lib.h"
+#include "usart/bsp_uart.h"
 
 void odom_rxcallback(uint8_t* data, uint16_t len);
 static odom_t* odom_ins = NULL;
 
 void Odom_Init(odom_t* odom_ptr, UART_HandleTypeDef* huart)
 {
-    memset(odom_ptr, 0, sizeof(odom_t));
-    BSP_UART_Init(odom_ptr->odom_uart, huart, 115200, odom_rxcallback, NULL, 0, RX_BUFFER_SIZE);
+    //memset(odom_ptr, 0, sizeof(odom_t));
+    BSP_UART_Init(&odom_ptr->odom_uart, huart, 115200, odom_rxcallback, NULL, 0, RX_BUFFER_SIZE);
     odom_ins = odom_ptr;
 }
 
@@ -30,8 +32,41 @@ void odom_rxcallback(uint8_t* data, const uint16_t len)
 
 void odom_pos_handler(const uint8_t* data, const uint16_t len)
 {
-    if (len != 12) return ;
+    if (len != 20) return ;
     memcpy(&odom_ins->x, &data[0], sizeof(fp32));
     memcpy(&odom_ins->y, &data[4], sizeof(fp32));
     memcpy(&odom_ins->theta, &data[8], sizeof(fp32));
+    memcpy(&odom_ins->vx, &data[12], sizeof(fp32));
+    memcpy(&odom_ins->vy, &data[16], sizeof(fp32));
+}
+
+void OdomCmd_PackPacket(const uint8_t *data_in, const uint16_t data_len, const uint16_t cmd_id)
+{
+    const uint16_t total_len = ODOM_HEADER_LEN + 1 + data_len + ODOM_CRC16_LEN;
+    uint8_t data_out[total_len];
+    uint32_t offset = 0;
+    data_out[offset++] = ODOM_HEADER_1;
+    data_out[offset++] = ODOM_HEADER_2;
+    data_out[offset++] = data_len & 0xFF;
+
+    data_out[offset++] = 0;
+    data_out[offset++] = 0;
+    data_out[offset++] = cmd_id & 0xFF;
+    if (data_in != NULL && data_len > 0) {
+        memcpy(&data_out[offset], data_in, data_len);
+        offset += data_len;
+    }
+    Append_CRC8_Check_Sum(data_out, ODOM_HEADER_LEN);
+    Append_CRC16_Check_Sum(data_out, total_len);
+
+    BSP_UART_Transmit(&odom_ins->odom_uart, data_out, sizeof(data_out), 100);
+}
+
+void odom_send_speed(const fp32 speed[3])
+{
+    static uint8_t send[12] = {0};
+    pack_float_to_4bytes(speed[0], &send[0]);
+    pack_float_to_4bytes(speed[1], &send[4]);
+    pack_float_to_4bytes(speed[2], &send[8]);
+    OdomCmd_PackPacket(send, sizeof(send), 0x02);
 }
