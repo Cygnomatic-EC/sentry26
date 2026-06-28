@@ -2,12 +2,13 @@
 #include "usart.h"
 #include "dwt/bsp_dwt.h"
 
-static rc_instance* rc_ins_ptr = NULL;
+static rc_instance dbus_instance;
 
 void RemoteDataProcess_UART(uint8_t *data, uint16_t len);
 void RemoteDataProcess_CAN(const uint8_t *data, uint32_t id, void* arg);
-void dbus_init(rc_instance* rc_ins, const RC_MODE mode, CAN_HandleTypeDef* hcan)
+void dbus_init(const RC_MODE mode, CAN_HandleTypeDef* hcan)
 {
+    rc_instance* rc_ins = &dbus_instance;
     memset(&rc_ins->rc_data, 0, sizeof(rc_data_t));
     if (mode == RC_DIRECT)
         rc_ins->rc_data.mode = RC_DIRECT;
@@ -21,12 +22,12 @@ void dbus_init(rc_instance* rc_ins, const RC_MODE mode, CAN_HandleTypeDef* hcan)
         BSP_CAN_RegisterStdCallback(rc_ins->dbus_can, DBUS_RXID, RemoteDataProcess_CAN, &rc_ins->rc_data);
     }
 
-    rc_ins_ptr = rc_ins;
+    dbus_instance.init = 1;
 }
 
 void RemoteDataProcess_UART(uint8_t *data, const uint16_t len)
 {
-    rc_data_t* rc_data = &rc_ins_ptr->rc_data;
+    rc_data_t* rc_data = &dbus_instance.rc_data;
     if (data == NULL || len != 18)
     {
         return;
@@ -43,7 +44,7 @@ void RemoteDataProcess_UART(uint8_t *data, const uint16_t len)
     rc_data->roll -= RC_CH_VALUE_OFFSET;
     rc_data->s1 = ((data[5] >> 4) & 0x0003);
     rc_data->s2 = ((data[5] >> 4) & 0x000C) >> 2;
-    rc_ins_ptr->last_online = DWT_GetTimeline_us();
+    dbus_instance.last_online = DWT_GetTimeline_us();
 }
 
 void RemoteDataProcess_CAN(const uint8_t *data, uint32_t id, void* arg)
@@ -66,6 +67,10 @@ void RemoteDataProcess_CAN(const uint8_t *data, uint32_t id, void* arg)
     rc_data->roll -= RC_CH_VALUE_OFFSET;
     rc_data->s1 = ((data[5] >> 4) & 0x0003);
     rc_data->s2 = ((data[5] >> 4) & 0x000C) >> 2;
-    rc_ins_ptr->last_online = DWT_GetTimeline_us();
+    dbus_instance.last_online = DWT_GetTimeline_us();
 }
 
+rc_instance *Get_DBUS_Instance(void)
+{
+    return &dbus_instance;
+}

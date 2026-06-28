@@ -17,7 +17,8 @@ typedef struct
     fp32 vx, vy;
 } odom_t;
 
-void Odom_Init(odom_t* odom_ptr, UART_HandleTypeDef* huart);
+void Odom_Init(UART_HandleTypeDef* huart);
 void odom_send_speed(const fp32 speed[3]);
+odom_t *Get_Odom_Instance(void);
 
 #endif //STANDARD_ROBOT_C_ODOM_H

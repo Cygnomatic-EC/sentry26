@@ -1,11 +1,28 @@
 // FUCK 灵足
 #include "rs02.h"
 
+static rs02_instance rs02[RS02_CNT_MAX];
+
 void get_rs02_measure_mit(const uint8_t* rx_data, uint32_t id, void* arg);
 void get_rs02_measure_private(const uint8_t* rx_data, uint32_t id, void* arg);
-RS02_Status_t rs02_init(rs02_instance* rs02_ins, CAN_HandleTypeDef *hcan, const uint8_t motorid, const uint8_t masterid,
+RS02_Status_t rs02_init(CAN_HandleTypeDef *hcan, const uint8_t motorid, const uint8_t masterid,
     const uint8_t mode, const uint8_t protocol)
 {
+    // 查找空闲或匹配motorid的实例
+    rs02_instance* rs02_ins = NULL;
+    for (uint8_t i = 0; i < RS02_CNT_MAX; i++)
+    {
+        if (rs02[i].motorid == motorid)
+        {
+            rs02_ins = &rs02[i];
+            break;
+        }
+        if (!rs02[i].init && rs02_ins == NULL)
+            rs02_ins = &rs02[i];
+    }
+    if (rs02_ins == NULL)
+        return RS02_ERROR;
+
     rs02_ins->can_ins = BSP_CAN_Init(hcan);
     rs02_ins->motorid = motorid;
     rs02_ins->masterid = masterid;
@@ -32,7 +49,18 @@ RS02_Status_t rs02_init(rs02_instance* rs02_ins, CAN_HandleTypeDef *hcan, const 
         rs02_enable_private(rs02_ins);
         osDelay(1);
     }
+    rs02_ins->init = 1;
     return RS02_OK;
+}
+
+rs02_instance *Get_RS02_Ptr(const uint8_t motorid)
+{
+    for (uint8_t i = 0; i < RS02_CNT_MAX; i++)
+    {
+        if (rs02[i].motorid == motorid)
+            return &rs02[i];
+    }
+    return NULL;
 }
 
 void rs02_change_masterid_mit(rs02_instance* rs02_ins, const uint8_t masterid)

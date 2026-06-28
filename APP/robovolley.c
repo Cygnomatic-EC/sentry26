@@ -28,36 +28,28 @@ static void gimbal_calc_pitch_target(robot_t* chassis_ptr);
 static void gimbal_calc_shoot_target(robot_t* chassis_ptr);
 static void gimbal_shoot_process(robot_t* chassis_ptr);
 static void gimbal_send_cmd(const robot_t* chassis_ptr);
-static void chasssis_send_pos(const robot_t* chassis_ptr);
-static void chasssis_send_vec(const robot_t* chassis_ptr);
-static void chasssis_send_motorspeed(const robot_t* chassis_ptr);
+static void datasend_send_pos(const robot_t* chassis_ptr);
+static void datasend_send_vec(const robot_t* chassis_ptr);
+static void datasend_send_motorspeed(const robot_t* chassis_ptr);
 
 void rs02_send_cmd_task(const void* argument);
 osThreadId rs02_taskHandle;
+
 /**
  * @brief 底盘初始化函数
- *        初始化各类传感器、电机控制、PID等
+ *        通过Get_xx_Ptr获取各模块实例指针
  */
 void Chassis_Init(robot_t* chassis_ptr)
 {
-    DWT_Init(DWT_CLOCK_FREQ);
-    dbus_init(&chassis_ptr->rc, RC_DIRECT, &hcan1);
-    static IMU_Data_t bmi088;
-    BMI088_Init(&bmi088);
-    INS_Init(&chassis.ins, &bmi088);
-    m3508_init(&chassis_ptr->m3508, &hcan1, M3508_TX_1, 3);
-    for (uint8_t i = 3; i < 4; i++)
+    chassis_ptr->rc = Get_DBUS_Instance();
+    chassis_ptr->m3508 = Get_M3508_Ptr(M3508_TX_1);
+    chassis_ptr->ins = Get_INS_Ptr();
+    chassis_ptr->nx_ctrl = Get_NX_Ctrl_Instance();
+    chassis_ptr->odom = Get_Odom_Instance();
+    for (uint8_t i = 0; i < 5; i++)
     {
-        rs02_init(&chassis_ptr->rs02[i], &hcan2, i + 0x01, 0xFD, RS02_MODE_POS, RS02_PROTOCOL_PRIVATE);
-        osDelay(1);
+        chassis_ptr->rs02[i] = Get_RS02_Ptr(i + 0x01);
     }
-    // for (uint8_t i = 0; i < 3; i++)
-    // {
-    //         rs02_setzero_private(&chassis_ptr->rs02[i]);
-    //         osDelay(1);
-    // }
-    Odom_Init(&chassis_ptr->odom, &huart1);
-    NX_Init(&chassis_ptr->nx_ctrl, &hcan2);
 
     memset(&chassis_ptr->ctrl, 0, sizeof(chassis_ptr->ctrl));
     chassis_filter_init(chassis_ptr);
@@ -70,7 +62,7 @@ void Chassis_Init(robot_t* chassis_ptr)
 /**
  * @brief 底盘控制任务，供FreeRTOS调用
  */
-void Control_Task(const void* argument)
+void Chassis_Task(const void* argument)
 {
     Chassis_Init(&chassis);
     static uint16_t ctrl_loop = 0;
@@ -81,28 +73,53 @@ void Control_Task(const void* argument)
         {
             chassis_switch_controller(&chassis);       // 切换控制源（遥控/上位机等）
             chassis_calc_move_speed(&chassis);         // 计算并过滤移动速度
-            // rc_offline_process(&chassis);          // 处理遥控器离线情况
             chassis_calc_wheelmotor_speed(&chassis);   // 解算底盘轮毂电机速度
             chassis_calc_wheelmotor_pidout(&chassis);  // 计算电机控制PID输出
             chassis_send_wheelmotor_cmd(&chassis);     // 下发3508控制指令
         }
+        ctrl_loop++;
+        if (ctrl_loop > 3000) ctrl_loop = 0;
+    }
+}
+
+/**
+ * @brief 云台控制任务，供FreeRTOS调用
+ */
+void Gimbal_Task(const void* argument)
+{
+    static uint16_t ctrl_loop = 0;
+    while(1)
+    {
+        osDelay(1);
         if (ctrl_loop % 3 == 1) // 云台控制循环 300Hz左右
         {
             chassis_switch_controller(&chassis);       // 切换控制源（遥控/上位机等）
-            // rc_offline_process(&chassis);          // 处理遥控器离线情况
             gimbal_calc_pitch_target(&chassis); // 计算云台pitch轴目标位置
             gimbal_calc_shoot_target(&chassis); // 计算击球目标位置和发球状态
             gimbal_shoot_process(&chassis);      // 发球状态机处理
-            //gimbal_send_cmd(&chassis);           // 下发云台控制指令
         }
+        ctrl_loop++;
+        if (ctrl_loop > 3000) ctrl_loop = 0;
+    }
+}
+
+/**
+ * @brief 数据发送任务，供FreeRTOS调用
+ */
+void DataSend_Task(const void* argument)
+{
+    static uint16_t ctrl_loop = 0;
+    while(1)
+    {
+        osDelay(1);
         if (ctrl_loop % 5 == 0) // 通信循环 200Hz左右
         {
-            chasssis_send_pos(&chassis);
-            chasssis_send_motorspeed(&chassis);
+            datasend_send_pos(&chassis);
+            datasend_send_motorspeed(&chassis);
         }
         if (ctrl_loop % 5 == 1) // 通信循环 200Hz左右
         {
-            chasssis_send_vec(&chassis);
+            datasend_send_vec(&chassis);
         }
 
         ctrl_loop++;
@@ -134,13 +151,13 @@ static void chassis_pid_init(robot_t* chassis_ptr)
  */
 static void chassis_switch_controller(robot_t* chassis_ptr)
 {
-    chassis_ptr->ctrl.robot_controller = chassis_ptr->rc.rc_data.s1;
-    chassis_ptr->ctrl.shoot_mode = chassis_ptr->rc.rc_data.s2;
+    chassis_ptr->ctrl.robot_controller = chassis_ptr->rc->rc_data.s1;
+    chassis_ptr->ctrl.shoot_mode = chassis_ptr->rc->rc_data.s2;
 }
 
 static void rc_offline_process(robot_t* chassis_ptr)
 {
-    if (DWT_GetTimeline_us() - chassis_ptr->rc.last_online > ms_to_us(1500))
+    if (DWT_GetTimeline_us() - chassis_ptr->rc->last_online > ms_to_us(1500))
     {
         chassis_ptr->ctrl.robot_controller = CHASSIS_RC_OFFLINE;
         chassis_ptr->ctrl.shoot_mode = SHOOT_RECEIVE;
@@ -161,16 +178,16 @@ static void chassis_calc_move_speed(robot_t* chassis_ptr)
     static fp32 vx, vy, vw;
     if (chassis_ptr->ctrl.robot_controller == CHASSIS_RC)
     {
-        vx = (fp32)chassis_ptr->rc.rc_data.ch2 * CHASSIS_MAX_V / RC_VAL_MAX;
-        vy = (fp32)chassis_ptr->rc.rc_data.ch3 * CHASSIS_MAX_V / RC_VAL_MAX;
-        vw = (fp32)chassis_ptr->rc.rc_data.ch0 * CHASSIS_MAX_W / RC_VAL_MAX;
+        vx = (fp32)chassis_ptr->rc->rc_data.ch2 * CHASSIS_MAX_V / RC_VAL_MAX;
+        vy = (fp32)chassis_ptr->rc->rc_data.ch3 * CHASSIS_MAX_V / RC_VAL_MAX;
+        vw = (fp32)chassis_ptr->rc->rc_data.ch0 * CHASSIS_MAX_W / RC_VAL_MAX;
     }
     else if (chassis_ptr->ctrl.robot_controller == CHASSIS_UPC)
     {
         ; // 需要计算位置环pid
-        vx = loop_float_constrain(chassis_ptr->nx_ctrl.target_x, -CHASSIS_MAX_V, CHASSIS_MAX_V);
-        vy = loop_float_constrain(chassis_ptr->nx_ctrl.target_y, -CHASSIS_MAX_V, CHASSIS_MAX_V);
-        vw = loop_float_constrain(chassis_ptr->nx_ctrl.target_yaw, -CHASSIS_MAX_W, CHASSIS_MAX_W);
+        vx = loop_float_constrain(chassis_ptr->nx_ctrl->target_x, -CHASSIS_MAX_V, CHASSIS_MAX_V);
+        vy = loop_float_constrain(chassis_ptr->nx_ctrl->target_y, -CHASSIS_MAX_V, CHASSIS_MAX_V);
+        vw = loop_float_constrain(chassis_ptr->nx_ctrl->target_yaw, -CHASSIS_MAX_W, CHASSIS_MAX_W);
     }
     else
     {
@@ -179,20 +196,8 @@ static void chassis_calc_move_speed(robot_t* chassis_ptr)
         vw = 0;
     }
 
-    // // 速度滤波
-    // first_order_filter_cali(&chassis_ptr->ctrl.chassis_speed_filter[0], vx);
-    // first_order_filter_cali(&chassis_ptr->ctrl.chassis_speed_filter[1], vy);
-    // first_order_filter_cali(&chassis_ptr->ctrl.chassis_speed_filter[2], vw);
-    // const fp32 vx_filter = chassis_ptr->ctrl.chassis_speed_filter[0].out;
-    // const fp32 vy_filter = chassis_ptr->ctrl.chassis_speed_filter[1].out;
-    // const fp32 vw_filter = chassis_ptr->ctrl.chassis_speed_filter[2].out;
-
     // 转换为合速度大小与角度（极坐标格式存储进 given_chassis_v）
     fp32 norm_v;
-    // arm_sqrt_f32(vx_filter * vx_filter + vy_filter * vy_filter, &norm_v);
-    // chassis_ptr->ctrl.given_chassis_v[0] = norm_v * LINEAR_TO_RPM;
-    // chassis_ptr->ctrl.given_chassis_v[1] = atan2f(vy_filter, vx_filter);
-    // chassis_ptr->ctrl.given_chassis_w = vw_filter * LINEAR_TO_RPM;
     arm_sqrt_f32(vx * vx + vy * vy, &norm_v);
     chassis_ptr->ctrl.given_chassis_v[0] = norm_v * LINEAR_TO_RPM;
     chassis_ptr->ctrl.given_chassis_v[1] = atan2f(vy, vx);
@@ -231,7 +236,7 @@ static void chassis_calc_wheelmotor_speed(robot_t* chassis_ptr)
     const fp32 vy = chassis_v * sinf(theta);
     int16_t motor_speeds[3];
 #ifdef OMNI
-    Omni_Kinematics_Resolve(vx, vy, chassis_w, -chassis_ptr->ins.ins.Yaw, motor_speeds);
+    Omni_Kinematics_Resolve(vx, vy, chassis_w, -chassis_ptr->ins->ins.Yaw, motor_speeds);
 #endif
 
     chassis_ptr->ctrl.m3508_controller[0].given_speed = motor_speeds[0];
@@ -246,7 +251,7 @@ static void chassis_calc_wheelmotor_pidout(robot_t* chassis_ptr)
 {
     for (int i = 0; i < 3; i++)
     {
-        PID_calc(&chassis_ptr->ctrl.m3508_controller[i].pid, chassis_ptr->m3508.ecd[i].speed, chassis_ptr->ctrl.m3508_controller[i].given_speed);
+        PID_calc(&chassis_ptr->ctrl.m3508_controller[i].pid, chassis_ptr->m3508->ecd[i].speed, chassis_ptr->ctrl.m3508_controller[i].given_speed);
         chassis_ptr->ctrl.m3508_controller[i].out = chassis_ptr->ctrl.m3508_controller[i].pid.out[0];
     }
 }
@@ -259,7 +264,7 @@ static void chassis_send_wheelmotor_cmd(const robot_t* chassis_ptr)
     int16_t m3508_iq[4];
     for (int i = 0; i < 3; i++)
         m3508_iq[i] = (int16_t)chassis_ptr->ctrl.m3508_controller[i].out;
-    m3508_ctrl(&chassis_ptr->m3508, m3508_iq);
+    m3508_ctrl(chassis_ptr->m3508, m3508_iq);
 }
 
 static void gimbal_calc_pitch_target(robot_t* chassis_ptr)
@@ -268,10 +273,10 @@ static void gimbal_calc_pitch_target(robot_t* chassis_ptr)
         switch (chassis_ptr->ctrl.robot_controller)
         {
             case CHASSIS_RC:
-                chassis_ptr->ctrl.given_pitch += ((fp32)chassis_ptr->rc.rc_data.ch1 * PITCH_DELTA_MAX);
+                chassis_ptr->ctrl.given_pitch += ((fp32)chassis_ptr->rc->rc_data.ch1 * PITCH_DELTA_MAX);
                 break;
             case CHASSIS_UPC:
-                chassis_ptr->ctrl.given_pitch = chassis_ptr->nx_ctrl.target_pitch;
+                chassis_ptr->ctrl.given_pitch = chassis_ptr->nx_ctrl->target_pitch;
                 break;
             default:
                 break;
@@ -285,9 +290,9 @@ static void gimbal_calc_pitch_target(robot_t* chassis_ptr)
 static void gimbal_calc_shoot_target(robot_t* chassis_ptr)
 {
     if (chassis_ptr->ctrl.robot_controller == CHASSIS_RC)
-        chassis_ptr->ctrl.shoot = chassis_ptr->rc.rc_data.roll > 600 ? 1 : 0;
+        chassis_ptr->ctrl.shoot = chassis_ptr->rc->rc_data.roll > 600 ? 1 : 0;
     else if (chassis_ptr->ctrl.robot_controller == CHASSIS_UPC)
-        chassis_ptr->ctrl.shoot = chassis_ptr->nx_ctrl.fire;
+        chassis_ptr->ctrl.shoot = chassis_ptr->nx_ctrl->fire;
     else
         chassis_ptr->ctrl.shoot = 0;
     if (chassis_ptr->ctrl.shoot && chassis_ptr->ctrl.shoot_step == 0)
@@ -420,13 +425,17 @@ void rs02_send_cmd_task(const void* argument)
     {
         uint8_t rs02_error = 0;
         for (uint8_t i = 0; i < 5; i++)
-            rs02_error |= chassis_ptr->rs02[i].ecd.error;
+            if (chassis_ptr->rs02[i] != NULL)
+                rs02_error |= chassis_ptr->rs02[i]->ecd.error;
         if (chassis_ptr->ctrl.rc_offline || chassis_ptr->ctrl.robot_controller == CHASSIS_SHUTDOWN || rs02_error)
         {
             for (uint8_t i = 0; i < 5; i++)
             {
-                rs02_disable_private(&chassis_ptr->rs02[i], 1);
-                osDelay(1);
+                if (chassis_ptr->rs02[i] != NULL)
+                {
+                    rs02_disable_private(chassis_ptr->rs02[i], 1);
+                    osDelay(1);
+                }
             }
             reconnect = 1;
             osDelay(1000);
@@ -435,17 +444,18 @@ void rs02_send_cmd_task(const void* argument)
         {
             for (uint8_t i = 0; i < 5; i++)
             {
-                rs02_enable_private(&chassis_ptr->rs02[i]);
-                osDelay(1);
+                if (chassis_ptr->rs02[i] != NULL)
+                {
+                    rs02_enable_private(chassis_ptr->rs02[i]);
+                    osDelay(1);
+                }
             }
             reconnect = 0;
         }
         if (!chassis_ptr->ctrl.rc_offline && chassis_ptr->ctrl.robot_controller != CHASSIS_SHUTDOWN && !rs02_error)
         {
-            //rs02_ctrl_3motor_pos_private(&chassis_ptr->rs02[0], &chassis_ptr->rs02[1], &chassis_ptr->rs02[2], chassis_ptr->ctrl.given_hit_pos, chassis_ptr->ctrl.given_hit_speed);
-            rs02_ctrl_pos_private(&chassis_ptr->rs02[3], chassis_ptr->ctrl.given_pitch, 4.0f);
-            //osDelay(1);
-            //rs02_ctrl_pos_private(&chassis_ptr->rs02[4], chassis_ptr->ctrl.given_shoot_angle, 44.0f);
+            if (chassis_ptr->rs02[3] != NULL)
+                rs02_ctrl_pos_private(chassis_ptr->rs02[3], chassis_ptr->ctrl.given_pitch, 4.0f);
         }
             osDelay(1);
 
@@ -458,17 +468,20 @@ static void gimbal_send_cmd(const robot_t* chassis_ptr)
     if (send_which == 0)
     {
         for (uint8_t i = 0; i < 3; i++)
-            rs02_ctrl_pos_private(&chassis_ptr->rs02[i], chassis_ptr->ctrl.given_hit_pos, chassis_ptr->ctrl.given_hit_speed);
+            if (chassis_ptr->rs02[i] != NULL)
+                rs02_ctrl_pos_private(chassis_ptr->rs02[i], chassis_ptr->ctrl.given_hit_pos, chassis_ptr->ctrl.given_hit_speed);
         send_which = 1;
     }
     else if (send_which == 1)
     {
-        rs02_ctrl_pos_private(&chassis_ptr->rs02[3], chassis_ptr->ctrl.given_pitch, 4.0f);
+        if (chassis_ptr->rs02[3] != NULL)
+            rs02_ctrl_pos_private(chassis_ptr->rs02[3], chassis_ptr->ctrl.given_pitch, 4.0f);
         send_which = 2;
     }
     else if (send_which == 2)
     {
-        rs02_ctrl_pos_private(&chassis_ptr->rs02[4], chassis_ptr->ctrl.given_shoot_angle, 44.0f);
+        if (chassis_ptr->rs02[4] != NULL)
+            rs02_ctrl_pos_private(chassis_ptr->rs02[4], chassis_ptr->ctrl.given_shoot_angle, 44.0f);
         send_which = 0;
     }
     else
@@ -478,19 +491,20 @@ static void gimbal_send_cmd(const robot_t* chassis_ptr)
 
 /**
  * @brief 将底盘位置信息发送到上位机
- * pitch轴数据可能需要改为计算电机编码器获得，是否要改取决于C板是否能安装在云台上
  */
-static void chasssis_send_pos(const robot_t* chassis_ptr)
+static void datasend_send_pos(const robot_t* chassis_ptr)
 {
-    const fp32 motor_pitch = (fp32)chassis_ptr->rs02[3].ecd.ecd / RS02_UINT16_MAX * 2.0f * RS02_ECD_MAX - RS02_ECD_MAX;
-    NX_SendPos(&chassis_ptr->nx_ctrl, chassis_ptr->odom.x, -chassis_ptr->odom.y, chassis_ptr->ins.ins.Yaw, motor_pitch);
+    const fp32 motor_pitch = (chassis_ptr->rs02[3] != NULL)
+        ? (fp32)chassis_ptr->rs02[3]->ecd.ecd / RS02_UINT16_MAX * 2.0f * RS02_ECD_MAX - RS02_ECD_MAX
+        : 0.0f;
+    NX_SendPos(chassis_ptr->nx_ctrl, chassis_ptr->odom->x, -chassis_ptr->odom->y, chassis_ptr->ins->ins.Yaw, motor_pitch);
 }
-static void chasssis_send_vec(const robot_t* chassis_ptr)
+static void datasend_send_vec(const robot_t* chassis_ptr)
 {
-    NX_SendVec(&chassis_ptr->nx_ctrl, chassis_ptr->odom.vx, -chassis_ptr->odom.vy);
+    NX_SendVec(chassis_ptr->nx_ctrl, chassis_ptr->odom->vx, -chassis_ptr->odom->vy);
 }
-static void chasssis_send_motorspeed(const robot_t* chassis_ptr)
+static void datasend_send_motorspeed(const robot_t* chassis_ptr)
 {
-    fp32 speed[3] = {(fp32)chassis_ptr->m3508.ecd[0].speed, (fp32)chassis_ptr->m3508.ecd[1].speed, (fp32)chassis_ptr->m3508.ecd[2].speed};
+    fp32 speed[3] = {(fp32)chassis_ptr->m3508->ecd[0].speed, (fp32)chassis_ptr->m3508->ecd[1].speed, (fp32)chassis_ptr->m3508->ecd[2].speed};
     odom_send_speed(speed);
 }

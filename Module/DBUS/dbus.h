@@ -51,8 +51,10 @@ typedef struct
     UART_Instance_t dbus_usart;
     CAN_Instance_t* dbus_can;
     uint64_t last_online;
+    uint8_t init;
 } rc_instance;
 
-void dbus_init(rc_instance* rc_ins, RC_MODE mode, CAN_HandleTypeDef* hcan);
+void dbus_init(RC_MODE mode, CAN_HandleTypeDef* hcan);
+rc_instance *Get_DBUS_Instance(void);
 
 #endif //STANDARD_ROBOT_C_DBUS_H

@@ -101,18 +101,19 @@ typedef struct
 {
     ctrl_data_t ctrl; // 核心控制数据
 
-    rc_instance rc; // 遥控器实例
-    m3508_instance m3508; // 3508电机实例
-    rs02_instance rs02[5]; // RS02电机实例
-    INS_t ins; // 惯性导航系统实例
-    nx_ctrl_t nx_ctrl;
-    odom_t odom; // 里程计实例
+    rc_instance *rc; // 遥控器实例
+    m3508_instance *m3508; // 3508电机实例
+    rs02_instance *rs02[5]; // RS02电机实例
+    INS_t *ins; // 惯性导航系统实例
+    nx_ctrl_t *nx_ctrl;
+    odom_t *odom; // 里程计实例
 } robot_t;
 
 /**
  * @brief 底盘控制任务函数，运行在RTOS任务中
  */
-void Control_Task(const void* argument);
+void Chassis_Task(const void* argument);
+void Gimbal_Task(const void* argument);
+void DataSend_Task(const void* argument);
 
 #endif //STANDARD_ROBOT_C_CHASSIS_H
-

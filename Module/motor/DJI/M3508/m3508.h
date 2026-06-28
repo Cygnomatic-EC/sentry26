@@ -34,9 +34,11 @@ typedef struct
     uint8_t num;
     uint32_t txid;
     m3508_ecd_t ecd[4];
+    uint8_t init;
 }m3508_instance;
 
-M3508_Status_t m3508_init(m3508_instance* m3508_ins, CAN_HandleTypeDef *hcan, uint32_t txid, uint8_t num);
+M3508_Status_t m3508_init(CAN_HandleTypeDef *hcan, uint32_t txid, uint8_t num);
 M3508_Status_t m3508_ctrl(const m3508_instance* m3508_ins, int16_t current[4]);
+m3508_instance *Get_M3508_Ptr(uint16_t txid);
 
 #endif //STANDARD_ROBOT_C_M3508_H
