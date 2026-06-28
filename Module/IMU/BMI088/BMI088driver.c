@@ -110,18 +110,15 @@ static void Calibrate_MPU_Offset(IMU_Data_t *bmi088);
 uint8_t BMI088_init(SPI_HandleTypeDef *bmi088_SPI, uint8_t calibrate);
 uint8_t bmi088_accel_init(void);
 uint8_t bmi088_gyro_init(void);
-static IMU_Data_t BMI088;
+static IMU_Data_t* BMI088 = NULL;
 
-void BMI088_Init(void)
+void BMI088_Init(IMU_Data_t* bmi088)
 {
+    if (bmi088 == NULL)
+        return ;
+    BMI088 = bmi088;
     while (BMI088_init(&hspi1, 1) != BMI088_NO_ERROR)
         ;
-    BMI088.init = 1;
-}
-
-IMU_Data_t *Get_BMI088_Ptr(void)
-{
-    return &BMI088;
 }
 
 uint8_t BMI088_init(SPI_HandleTypeDef *bmi088_SPI, const uint8_t calibrate)
@@ -132,15 +129,15 @@ uint8_t BMI088_init(SPI_HandleTypeDef *bmi088_SPI, const uint8_t calibrate)
     error |= bmi088_accel_init();
     error |= bmi088_gyro_init();
     if (calibrate)
-        Calibrate_MPU_Offset(&BMI088);
+        Calibrate_MPU_Offset(BMI088);
     else
     {
-        BMI088.GyroOffset[0] = GxOFFSET;
-        BMI088.GyroOffset[1] = GyOFFSET;
-        BMI088.GyroOffset[2] = GzOFFSET;
-        BMI088.gNorm = gNORM;
-        BMI088.AccelScale = 9.81f / BMI088.gNorm;
-        BMI088.TempWhenCali = 40;
+        BMI088->GyroOffset[0] = GxOFFSET;
+        BMI088->GyroOffset[1] = GyOFFSET;
+        BMI088->GyroOffset[2] = GzOFFSET;
+        BMI088->gNorm = gNORM;
+        BMI088->AccelScale = 9.81f / BMI088->gNorm;
+        BMI088->TempWhenCali = 40;
     }
 
     return error;
@@ -350,21 +347,19 @@ uint8_t bmi088_gyro_init(void)
     return BMI088_NO_ERROR;
 }
 
-void BMI088_Read(void)
+void BMI088_Read(IMU_Data_t *bmi088)
 {
-    if (!BMI088.init)
-        return;
     static uint8_t buf[8] = {0, 0, 0, 0, 0, 0};
     static int16_t bmi088_raw_temp;
 
     BMI088_accel_read_muli_reg(BMI088_ACCEL_XOUT_L, buf, 6);
 
     bmi088_raw_temp = (int16_t)((buf[1]) << 8) | buf[0];
-    BMI088.Accel[0] = bmi088_raw_temp * BMI088_ACCEL_SEN * BMI088.AccelScale;
+    bmi088->Accel[0] = bmi088_raw_temp * BMI088_ACCEL_SEN * bmi088->AccelScale;
     bmi088_raw_temp = (int16_t)((buf[3]) << 8) | buf[2];
-    BMI088.Accel[1] = bmi088_raw_temp * BMI088_ACCEL_SEN * BMI088.AccelScale;
+    bmi088->Accel[1] = bmi088_raw_temp * BMI088_ACCEL_SEN * bmi088->AccelScale;
     bmi088_raw_temp = (int16_t)((buf[5]) << 8) | buf[4];
-    BMI088.Accel[2] = bmi088_raw_temp * BMI088_ACCEL_SEN * BMI088.AccelScale;
+    bmi088->Accel[2] = bmi088_raw_temp * BMI088_ACCEL_SEN * bmi088->AccelScale;
 
     BMI088_gyro_read_muli_reg(BMI088_GYRO_CHIP_ID, buf, 8);
     if (buf[0] == BMI088_GYRO_CHIP_ID_VALUE)
@@ -372,20 +367,20 @@ void BMI088_Read(void)
         if (caliOffset)
         {
             bmi088_raw_temp = (int16_t)((buf[3]) << 8) | buf[2];
-            BMI088.Gyro[0] = bmi088_raw_temp * BMI088_GYRO_SEN - BMI088.GyroOffset[0];
+            bmi088->Gyro[0] = bmi088_raw_temp * BMI088_GYRO_SEN - bmi088->GyroOffset[0];
             bmi088_raw_temp = (int16_t)((buf[5]) << 8) | buf[4];
-            BMI088.Gyro[1] = bmi088_raw_temp * BMI088_GYRO_SEN - BMI088.GyroOffset[1];
+            bmi088->Gyro[1] = bmi088_raw_temp * BMI088_GYRO_SEN - bmi088->GyroOffset[1];
             bmi088_raw_temp = (int16_t)((buf[7]) << 8) | buf[6];
-            BMI088.Gyro[2] = bmi088_raw_temp * BMI088_GYRO_SEN - BMI088.GyroOffset[2];
+            bmi088->Gyro[2] = bmi088_raw_temp * BMI088_GYRO_SEN - bmi088->GyroOffset[2];
         }
         else
         {
             bmi088_raw_temp = (int16_t)((buf[3]) << 8) | buf[2];
-            BMI088.Gyro[0] = bmi088_raw_temp * BMI088_GYRO_SEN;
+            bmi088->Gyro[0] = bmi088_raw_temp * BMI088_GYRO_SEN;
             bmi088_raw_temp = (int16_t)((buf[5]) << 8) | buf[4];
-            BMI088.Gyro[1] = bmi088_raw_temp * BMI088_GYRO_SEN;
+            bmi088->Gyro[1] = bmi088_raw_temp * BMI088_GYRO_SEN;
             bmi088_raw_temp = (int16_t)((buf[7]) << 8) | buf[6];
-            BMI088.Gyro[2] = bmi088_raw_temp * BMI088_GYRO_SEN;
+            bmi088->Gyro[2] = bmi088_raw_temp * BMI088_GYRO_SEN;
         }
     }
     BMI088_accel_read_muli_reg(BMI088_TEMP_M, buf, 2);
@@ -397,7 +392,7 @@ void BMI088_Read(void)
         bmi088_raw_temp -= 2048;
     }
 
-    BMI088.Temperature = bmi088_raw_temp * BMI088_TEMP_FACTOR + BMI088_TEMP_OFFSET;
+    bmi088->Temperature = bmi088_raw_temp * BMI088_TEMP_FACTOR + BMI088_TEMP_OFFSET;
 }
 
 #if defined(BMI088_USE_SPI)

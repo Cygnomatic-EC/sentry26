@@ -4,12 +4,13 @@
 #include "usart/bsp_uart.h"
 
 void odom_rxcallback(uint8_t* data, uint16_t len);
-static odom_t odom_instance;
+static odom_t* odom_ins = NULL;
 
-void Odom_Init(UART_HandleTypeDef* huart)
+void Odom_Init(odom_t* odom_ptr, UART_HandleTypeDef* huart)
 {
     //memset(odom_ptr, 0, sizeof(odom_t));
-    BSP_UART_Init(&odom_instance.odom_uart, huart, 115200, odom_rxcallback, NULL, 0, RX_BUFFER_SIZE);
+    BSP_UART_Init(&odom_ptr->odom_uart, huart, 115200, odom_rxcallback, NULL, TX_BUFFER_SIZE, RX_BUFFER_SIZE);
+    odom_ins = odom_ptr;
 }
 
 void odom_pos_handler(const uint8_t* data, uint16_t len);
@@ -32,11 +33,11 @@ void odom_rxcallback(uint8_t* data, const uint16_t len)
 void odom_pos_handler(const uint8_t* data, const uint16_t len)
 {
     if (len != 20) return ;
-    memcpy(&odom_instance.x, &data[0], sizeof(fp32));
-    memcpy(&odom_instance.y, &data[4], sizeof(fp32));
-    memcpy(&odom_instance.theta, &data[8], sizeof(fp32));
-    memcpy(&odom_instance.vx, &data[12], sizeof(fp32));
-    memcpy(&odom_instance.vy, &data[16], sizeof(fp32));
+    memcpy(&odom_ins->x, &data[0], sizeof(fp32));
+    memcpy(&odom_ins->y, &data[4], sizeof(fp32));
+    memcpy(&odom_ins->theta, &data[8], sizeof(fp32));
+    memcpy(&odom_ins->vx, &data[12], sizeof(fp32));
+    memcpy(&odom_ins->vy, &data[16], sizeof(fp32));
 }
 
 void OdomCmd_PackPacket(const uint8_t *data_in, const uint16_t data_len, const uint16_t cmd_id)
@@ -58,19 +59,12 @@ void OdomCmd_PackPacket(const uint8_t *data_in, const uint16_t data_len, const u
     Append_CRC8_Check_Sum(data_out, ODOM_HEADER_LEN);
     Append_CRC16_Check_Sum(data_out, total_len);
 
-    BSP_UART_Transmit(&odom_instance.odom_uart, data_out, sizeof(data_out), 100);
+    BSP_UART_Transmit(&odom_ins->odom_uart, data_out, sizeof(data_out), 100);
 }
 
-void odom_send_speed(const fp32 speed[3])
+void odom_send_speed(const int16_t speed[3])
 {
-    static uint8_t send[12] = {0};
-    pack_float_to_4bytes(speed[0], &send[0]);
-    pack_float_to_4bytes(speed[1], &send[4]);
-    pack_float_to_4bytes(speed[2], &send[8]);
+    static uint8_t send[6] = {0};
+    memcpy(send, speed, 6);
     OdomCmd_PackPacket(send, sizeof(send), 0x02);
-}
-
-odom_t *Get_Odom_Instance(void)
-{
-    return &odom_instance;
 }

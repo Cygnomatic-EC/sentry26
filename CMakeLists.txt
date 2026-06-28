@@ -71,6 +71,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         Module/IMU/EKF/QuaternionEKF.c
         Module/IMU/INS/ins.c
         Module/LED/led.c
+        Module/HC-SR04/hc.c
         APP/task_init.c
         APP/robovolley.c
         APP/daemon.c

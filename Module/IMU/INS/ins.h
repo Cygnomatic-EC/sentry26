@@ -37,13 +37,11 @@ typedef struct
     INS_data_t ins;
     IMU_Data_t* imu;
     pwm_instance pwm;
-    uint8_t init;
 } INS_t;
 
-void INS_Init(void);
-void INS_Update(void);
-void IMU_Temperature_Ctrl(void);
-INS_t *Get_INS_Ptr(void);
+void INS_Init(INS_t *INS, IMU_Data_t *bmi088);
+void INS_Update(INS_t *ins_ins);
+void IMU_Temperature_Ctrl(const INS_t *ins_ins);
 
 void BodyFrameToEarthFrame(const float *vecBF, float *vecEF, const float *q);
 void EarthFrameToBodyFrame(const float *vecEF, float *vecBF, const float *q);

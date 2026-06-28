@@ -9,6 +9,8 @@
 #include "Odom/odom.h"
 #include "NX/nx.h"
 #include "motor/RS/rs02.h"
+#include "HC-SR04/hc.h"
+#include "VOFA/vofa.h"
 
 #define PITCH_DELTA_MAX (-0.000001f)
 #define PITCH_MAX (0.1f)
@@ -101,19 +103,21 @@ typedef struct
 {
     ctrl_data_t ctrl; // 核心控制数据
 
-    rc_instance *rc; // 遥控器实例
-    m3508_instance *m3508; // 3508电机实例
-    rs02_instance *rs02[5]; // RS02电机实例
-    INS_t *ins; // 惯性导航系统实例
-    nx_ctrl_t *nx_ctrl;
-    odom_t *odom; // 里程计实例
+    rc_instance rc; // 遥控器实例
+    m3508_instance m3508; // 3508电机实例
+    rs02_instance rs02[5]; // RS02电机实例
+    INS_t ins; // 惯性导航系统实例
+    nx_ctrl_t nx_ctrl;
+    odom_t odom; // 里程计实例
+    hc_t *hc;
+    vofa_t *vofa;
+
 } robot_t;
 
 /**
  * @brief 底盘控制任务函数，运行在RTOS任务中
  */
-void Chassis_Task(const void* argument);
-void Gimbal_Task(const void* argument);
-void DataSend_Task(const void* argument);
+void Control_Task(const void* argument);
 
 #endif //STANDARD_ROBOT_C_CHASSIS_H
+

@@ -15,7 +15,8 @@ typedef struct
     uint8_t ready;
 } vofa_t;
 
-void vofa_init(vofa_t* vofa, UART_HandleTypeDef* huart, uint16_t txnum, uint16_t rxnum);
-void vofa_print(vofa_t* vofa, const fp32* data);
+void vofa_init(UART_HandleTypeDef* huart, uint16_t txnum, uint16_t rxnum);
+void vofa_print(const fp32* data);
+vofa_t* Get_Vofa_Ptr();
 
 #endif //STANDARD_ROBOT_C_VOFA_H

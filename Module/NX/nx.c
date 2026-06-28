@@ -1,18 +1,14 @@
 #include "nx.h"
-#include <string.h>
-
-static nx_ctrl_t nx_instance;
 
 void NX_CtrlCallback(const uint8_t *data, uint32_t id, void *arg);
-void NX_Init(CAN_HandleTypeDef *hcan)
+void NX_Init(nx_ctrl_t *nx_ctrl, CAN_HandleTypeDef *hcan)
 {
-    if (hcan == NULL)
+    if (nx_ctrl == NULL || hcan == NULL)
         return;
-    memset(&nx_instance, 0, sizeof(nx_ctrl_t));
-    nx_instance.nx_can = BSP_CAN_Init(hcan);
-    BSP_CAN_RegisterStdCallback(nx_instance.nx_can, CMD_ID_POS_CTRL, NX_CtrlCallback, &nx_instance);
-    BSP_CAN_RegisterStdCallback(nx_instance.nx_can, CMD_ID_POS_CTRL_FIRE, NX_CtrlCallback, &nx_instance);
-    nx_instance.init = 1;
+    memset(nx_ctrl, 0, sizeof(nx_ctrl_t));
+    nx_ctrl->nx_can = BSP_CAN_Init(hcan);
+    BSP_CAN_RegisterStdCallback(nx_ctrl->nx_can, CMD_ID_POS_CTRL, NX_CtrlCallback, nx_ctrl);
+    BSP_CAN_RegisterStdCallback(nx_ctrl->nx_can, CMD_ID_POS_CTRL_FIRE, NX_CtrlCallback, nx_ctrl);
 }
 
 void NX_CtrlCallback(const uint8_t *data, const uint32_t id, void *arg)
@@ -55,9 +51,4 @@ void NX_SendVec(const nx_ctrl_t *nx_ctrl_ptr, const fp32 vx, const fp32 vy)
     memcpy(&data[0], &vx, sizeof(fp32));
     memcpy(&data[4], &vy, sizeof(fp32));
     BSP_CAN_Transmit(nx_ctrl_ptr->nx_can, CMD_ID_VEC_INFO, CAN_ID_STD, data, 8);
-}
-
-nx_ctrl_t *Get_NX_Ctrl_Instance(void)
-{
-    return &nx_instance;
 }

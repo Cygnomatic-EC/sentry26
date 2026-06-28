@@ -84,7 +84,6 @@ typedef struct
     float GyroOffset[3];
 
     float gNorm;
-    uint8_t init;
 } IMU_Data_t;
 
 enum
@@ -109,8 +108,7 @@ enum
     BMI088_NO_SENSOR = 0xFF,
 };
 
-void BMI088_Init(void);
-void BMI088_Read(void);
-IMU_Data_t *Get_BMI088_Ptr(void);
+void BMI088_Init(IMU_Data_t *bmi088);
+void BMI088_Read(IMU_Data_t *bmi088);
 
 #endif
