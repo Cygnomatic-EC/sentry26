@@ -14,6 +14,7 @@ const pid_config m3508_pid_config = {.mode = PID_POSITION, .kp = 8.0f, .ki = 0.0
 const pid_config chassisyaw_pid_config = {.mode = PID_POSITION, .kp = 10.0f, .ki = 0.0f, .kd = 0.0f, .max_out = 20000.0f, .max_iout = 5000.0f,
     .out_limit_delta_P = 1000.0f, .out_limit_delta_N = 4000.0f, .deadzone = 0.0f};
 robot_t chassis;
+#define MAX_OF_THREE(a, b, c) (((a) > (b)) ? (((a) > (c)) ? (a) : (c)) : (((b) > (c)) ? (b) : (c)))
 
 // ---------- 内部静态函数声明 ----------
 static void chassis_filter_init(robot_t* chassis_ptr);
@@ -23,11 +24,10 @@ static void chassis_calc_move_speed(robot_t* chassis_ptr);
 static void chassis_calc_wheelmotor_speed(robot_t* chassis_ptr);
 static void chassis_calc_wheelmotor_pidout(robot_t* chassis_ptr);
 static void chassis_send_wheelmotor_cmd(const robot_t* chassis_ptr);
-static void rc_offline_process(robot_t* chassis_ptr);
+//static void rc_offline_process(robot_t* chassis_ptr);
 static void gimbal_calc_pitch_target(robot_t* chassis_ptr);
 static void gimbal_calc_shoot_target(robot_t* chassis_ptr);
 static void gimbal_shoot_process(robot_t* chassis_ptr);
-static void gimbal_send_cmd(const robot_t* chassis_ptr);
 static void chasssis_send_pos(const robot_t* chassis_ptr);
 static void chasssis_send_vec(const robot_t* chassis_ptr);
 static void chasssis_send_motorspeed(const robot_t* chassis_ptr);
@@ -46,22 +46,22 @@ void Chassis_Init(robot_t* chassis_ptr)
     BMI088_Init(&bmi088);
     INS_Init(&chassis.ins, &bmi088);
     m3508_init(&chassis_ptr->m3508, &hcan1, M3508_TX_1, 3);
-    for (uint8_t i = 3; i < 4; i++)
+    for (uint8_t i = 0; i < 5; i++)
     {
         rs02_init(&chassis_ptr->rs02[i], &hcan2, i + 0x01, 0xFD, RS02_MODE_POS, RS02_PROTOCOL_PRIVATE);
         osDelay(1);
     }
     // for (uint8_t i = 0; i < 3; i++)
     // {
-    //         rs02_setzero_private(&chassis_ptr->rs02[i]);
-    //         osDelay(1);
+             // rs02_setzero_private(&chassis_ptr->rs02[4]);
+             // osDelay(1);
     // }
     Odom_Init(&chassis_ptr->odom, &huart1);
     NX_Init(&chassis_ptr->nx_ctrl, &hcan2);
 
     hc_init(GPIOB, GPIO_PIN_13, GPIOB, GPIO_PIN_12);
     chassis_ptr->hc = Get_HC_Ptr();
-    vofa_init(&huart6, 2, 0);
+    vofa_init(&huart6, 3, 0);
     chassis_ptr->vofa = Get_Vofa_Ptr();
 
     memset(&chassis_ptr->ctrl, 0, sizeof(chassis_ptr->ctrl));
@@ -108,10 +108,14 @@ void Control_Task(const void* argument)
         if (ctrl_loop % 5 == 1) // 通信循环 200Hz左右
         {
             chasssis_send_vec(&chassis);
-            const fp32 send[2] = {chassis.hc->dis, chassis.hc->vec};
+            const uint16_t torque = MAX_OF_THREE(chassis.rs02[0].ecd.torch, chassis.rs02[1].ecd.torch, chassis.rs02[2].ecd.torch);
+            const uint8_t case2 = (fp32)torque / RS02_UINT16_MAX * 2.0f * RS02_TORCH_MAX - RS02_TORCH_MAX > 2.0f && loop_float_constrain((fp32)chassis.rs02[0].ecd.ecd / RS02_UINT16_MAX * 2.0f * RS02_ECD_MAX - RS02_ECD_MAX, -PI, PI) < 0.10f;
+            //fp32 angle = loop_float_constrain((fp32)chassis.rs02[0].ecd.ecd / RS02_UINT16_MAX * 2.0f * RS02_ECD_MAX - RS02_ECD_MAX, -PI, PI);
+            //const fp32 send[3] = {DWT_GetTimeline_ms(), chassis.hc->dis, (fp32)case2};
+            const fp32 send[3] = {DWT_GetTimeline_ms(), (fp32)chassis.rs02[4].ecd.speed / RS02_UINT16_MAX * 2.0f * RS02_SPEED_MAX - RS02_SPEED_MAX, (fp32)chassis.rs02[4].ecd.torch / RS02_UINT16_MAX * 2.0f * RS02_TORCH_MAX - RS02_TORCH_MAX};
             vofa_print(send);
         }
-        if (ctrl_loop % 100 == 1)
+        if (ctrl_loop % 50 == 1)
         {
             hc_trig();
         }
@@ -149,20 +153,20 @@ static void chassis_switch_controller(robot_t* chassis_ptr)
     chassis_ptr->ctrl.shoot_mode = chassis_ptr->rc.rc_data.s2;
 }
 
-static void rc_offline_process(robot_t* chassis_ptr)
-{
-    if (DWT_GetTimeline_us() - chassis_ptr->rc.last_online > ms_to_us(1500))
-    {
-        chassis_ptr->ctrl.robot_controller = CHASSIS_RC_OFFLINE;
-        chassis_ptr->ctrl.shoot_mode = SHOOT_RECEIVE;
-        chassis_ptr->ctrl.given_chassis_v[0] = 0;
-        chassis_ptr->ctrl.given_chassis_v[1] = 0;
-        chassis_ptr->ctrl.given_chassis_w = 0;
-        chassis_ptr->ctrl.rc_offline = 1;
-    }
-    else
-        chassis_ptr->ctrl.rc_offline = 0;
-}
+// static void rc_offline_process(robot_t* chassis_ptr)
+// {
+//     if (DWT_GetTimeline_us() - chassis_ptr->rc.last_online > ms_to_us(1500))
+//     {
+//         chassis_ptr->ctrl.robot_controller = CHASSIS_RC_OFFLINE;
+//         chassis_ptr->ctrl.shoot_mode = SHOOT_RECEIVE;
+//         chassis_ptr->ctrl.given_chassis_v[0] = 0;
+//         chassis_ptr->ctrl.given_chassis_v[1] = 0;
+//         chassis_ptr->ctrl.given_chassis_w = 0;
+//         chassis_ptr->ctrl.rc_offline = 1;
+//     }
+//     else
+//         chassis_ptr->ctrl.rc_offline = 0;
+// }
 
 /**
  * @brief 解算给定移动速度（获取控制源指令并滤波）
@@ -299,7 +303,15 @@ static void gimbal_calc_shoot_target(robot_t* chassis_ptr)
     if (chassis_ptr->ctrl.robot_controller == CHASSIS_RC)
         chassis_ptr->ctrl.shoot = chassis_ptr->rc.rc_data.roll > 600 ? 1 : 0;
     else if (chassis_ptr->ctrl.robot_controller == CHASSIS_UPC)
-        chassis_ptr->ctrl.shoot = chassis_ptr->nx_ctrl.fire;
+    {
+        const uint16_t torque = MAX_OF_THREE(chassis.rs02[0].ecd.torch, chassis.rs02[1].ecd.torch, chassis.rs02[2].ecd.torch);
+        const uint8_t case1 = (chassis_ptr->hc->dis < 50.0f && chassis_ptr->hc->dis / chassis_ptr->hc->vec < 0.0f && chassis_ptr->hc->dis / chassis_ptr->hc->vec > -4.0f);
+        const uint8_t case2 = (fp32)torque / RS02_UINT16_MAX * 2.0f * RS02_TORCH_MAX - RS02_TORCH_MAX > 2.0f && loop_float_constrain((fp32)chassis.rs02[0].ecd.ecd / RS02_UINT16_MAX * 2.0f * RS02_ECD_MAX - RS02_ECD_MAX, -PI, PI) < 0.10f;
+        if (case1 || case2)
+            chassis_ptr->ctrl.shoot = 1;
+        else
+            chassis_ptr->ctrl.shoot = 0;
+    }
     else
         chassis_ptr->ctrl.shoot = 0;
     if (chassis_ptr->ctrl.shoot && chassis_ptr->ctrl.shoot_step == 0)
@@ -317,23 +329,34 @@ static void gimbal_shoot_process(robot_t* chassis_ptr)
             {
                 chassis_ptr->ctrl.given_hit_pos = 0.036f;
                 chassis_ptr->ctrl.given_hit_speed = 4.0f;
-                chassis_ptr->ctrl.given_shoot_angle = 1.4f;
+                chassis_ptr->ctrl.given_shoot_angle = SHOOT_FIRE_PREPARE_ANGLE;
+                chassis_ptr->ctrl.given_shoot_speed = 2.0f;
                 chassis_ptr->ctrl.given_pitch = 0.0f;
             }
             else
             {
-                chassis_ptr->ctrl.given_hit_pos = 0.083f;
+                chassis_ptr->ctrl.given_hit_pos = SHOOT_RECEIVE_POS;
                 chassis_ptr->ctrl.given_hit_speed = 8.0f;
                 chassis_ptr->ctrl.given_shoot_angle = 0.0f;
+                chassis_ptr->ctrl.given_shoot_speed = 2.0f;
             }
             break;
         }
         case SHOOT_PREPARE:
         {
-            chassis_ptr->ctrl.given_hit_pos = 0.083f;
-            chassis_ptr->ctrl.given_hit_speed = 1.0f;
-            last_time = DWT_GetTimeline_us();
-            chassis_ptr->ctrl.shoot_step = SHOOT_DELAY_1;
+            if (chassis_ptr->ctrl.shoot_mode == SHOOT_SERVE)
+            {
+                chassis_ptr->ctrl.given_hit_pos = 0.08f;
+                chassis_ptr->ctrl.given_hit_speed = 8.0f;
+                last_time = DWT_GetTimeline_us();
+                chassis_ptr->ctrl.shoot_step = SHOOT_DELAY_1;
+            }
+            else
+            {
+                chassis_ptr->ctrl.given_hit_pos = SHOOT_RECEIVE_POS;
+                chassis_ptr->ctrl.given_hit_speed = 8.0f;
+                chassis_ptr->ctrl.shoot_step = SHOOT_HIT;
+            }
             break;
         }
         case SHOOT_DELAY_1:
@@ -348,13 +371,15 @@ static void gimbal_shoot_process(robot_t* chassis_ptr)
         {
             if (chassis_ptr->ctrl.shoot_mode == SHOOT_SERVE)
             {
-                chassis_ptr->ctrl.given_hit_pos = 0.28f;
-                chassis_ptr->ctrl.given_hit_speed = 8.0f;
+                chassis_ptr->ctrl.given_hit_pos = 0.22f;
+                chassis_ptr->ctrl.given_hit_speed = 12.0f;
+                chassis_ptr->ctrl.given_shoot_angle = 2.0f;
+                chassis_ptr->ctrl.given_shoot_speed = 44.0f;
             }
             else
             {
                 chassis_ptr->ctrl.given_hit_pos = 0.60f;
-                chassis_ptr->ctrl.given_hit_speed = 24.0f;
+                chassis_ptr->ctrl.given_hit_speed = 32.0f;
                 chassis_ptr->ctrl.given_shoot_angle = 0.0f;
             }
             last_time = DWT_GetTimeline_us();
@@ -363,12 +388,12 @@ static void gimbal_shoot_process(robot_t* chassis_ptr)
         }
         case SHOOT_DELAY_2:
         {
-            if (DWT_GetTimeline_us() - last_time >= ms_to_us(175)) // 175ms击球时间
+            if (DWT_GetTimeline_us() - last_time >= ms_to_us(100)) // 发球主要调这个时间和下面一个时间
             {
                 if (chassis_ptr->ctrl.shoot_mode == SHOOT_SERVE)
                     chassis_ptr->ctrl.shoot_step = SHOOT_LEANING;
                 else
-                    chassis_ptr->ctrl.shoot_step = SHOOT_DEFAULT;
+                    chassis_ptr->ctrl.shoot_step = SHOOT_REPARE;
             }
             break;
         }
@@ -378,12 +403,12 @@ static void gimbal_shoot_process(robot_t* chassis_ptr)
             chassis_ptr->ctrl.given_hit_speed = 8.0f;
             chassis_ptr->ctrl.given_pitch = -0.8f;
             last_time = DWT_GetTimeline_us();
-            chassis_ptr->ctrl.shoot_step = SHOOT_DELAY_3;
+            chassis_ptr->ctrl.shoot_step = SHOOT_DELAY_4;
             break;
         }
         case SHOOT_DELAY_3:
         {
-            if (DWT_GetTimeline_us() - last_time >= ms_to_us(250))
+            if (DWT_GetTimeline_us() - last_time >= ms_to_us(10))
             {
                 chassis_ptr->ctrl.shoot_step = SHOOT_SHOOT;
             }
@@ -391,7 +416,8 @@ static void gimbal_shoot_process(robot_t* chassis_ptr)
         }
         case SHOOT_SHOOT:
         {
-            chassis_ptr->ctrl.given_shoot_angle = -2.9f;
+            chassis_ptr->ctrl.given_shoot_angle = 2.0f;
+            chassis_ptr->ctrl.given_shoot_speed = 44.0f;
             last_time = DWT_GetTimeline_us();
             chassis_ptr->ctrl.shoot_step = SHOOT_DELAY_4;
             break;
@@ -406,14 +432,31 @@ static void gimbal_shoot_process(robot_t* chassis_ptr)
         }
         case SHOOT_BACK:
         {
-            chassis_ptr->ctrl.given_shoot_angle = 1.5f;
+            chassis_ptr->ctrl.given_shoot_angle = SHOOT_FIRE_PREPARE_ANGLE;
+            chassis_ptr->ctrl.given_shoot_speed = 2.0f;
             last_time = DWT_GetTimeline_us();
             chassis_ptr->ctrl.shoot_step = SHOOT_DELAY_5;
             break;
         }
         case SHOOT_DELAY_5:
         {
-            if (DWT_GetTimeline_us() - last_time >= ms_to_us(1000))
+            if (DWT_GetTimeline_us() - last_time >= ms_to_us(3000))
+            {
+                chassis_ptr->ctrl.shoot_step = SHOOT_DEFAULT;
+            }
+            break;
+        }
+        case SHOOT_REPARE:
+        {
+            chassis_ptr->ctrl.given_hit_pos = SHOOT_RECEIVE_POS;
+            chassis_ptr->ctrl.given_hit_speed = 8.0f;
+            chassis_ptr->ctrl.given_shoot_angle = 0.0f;
+            chassis_ptr->ctrl.shoot_step = SHOOT_DELAY_6;
+            break;
+        }
+        case SHOOT_DELAY_6:
+        {
+            if (DWT_GetTimeline_us() - last_time >= ms_to_us(1250))
             {
                 chassis_ptr->ctrl.shoot_step = SHOOT_DEFAULT;
             }
@@ -433,7 +476,7 @@ void rs02_send_cmd_task(const void* argument)
         uint8_t rs02_error = 0;
         for (uint8_t i = 0; i < 5; i++)
             rs02_error |= chassis_ptr->rs02[i].ecd.error;
-        if (chassis_ptr->ctrl.rc_offline || chassis_ptr->ctrl.robot_controller == CHASSIS_SHUTDOWN || rs02_error)
+        if (chassis_ptr->ctrl.rc_offline || chassis_ptr->ctrl.robot_controller == CHASSIS_SHUTDOWN || chassis_ptr->ctrl.robot_controller == CHASSIS_RC_OFFLINE || rs02_error)
         {
             for (uint8_t i = 0; i < 5; i++)
             {
@@ -443,7 +486,7 @@ void rs02_send_cmd_task(const void* argument)
             reconnect = 1;
             osDelay(1000);
         }
-        else if (!chassis_ptr->ctrl.rc_offline && chassis_ptr->ctrl.robot_controller != CHASSIS_SHUTDOWN && !rs02_error && reconnect)
+        else if (!chassis_ptr->ctrl.rc_offline && chassis_ptr->ctrl.robot_controller != CHASSIS_SHUTDOWN && chassis_ptr->ctrl.robot_controller != CHASSIS_RC_OFFLINE && !rs02_error && reconnect)
         {
             for (uint8_t i = 0; i < 5; i++)
             {
@@ -452,40 +495,16 @@ void rs02_send_cmd_task(const void* argument)
             }
             reconnect = 0;
         }
-        if (!chassis_ptr->ctrl.rc_offline && chassis_ptr->ctrl.robot_controller != CHASSIS_SHUTDOWN && !rs02_error)
+        if (!chassis_ptr->ctrl.rc_offline && chassis_ptr->ctrl.robot_controller != CHASSIS_SHUTDOWN && chassis_ptr->ctrl.robot_controller != CHASSIS_RC_OFFLINE && !rs02_error)
         {
-            //rs02_ctrl_3motor_pos_private(&chassis_ptr->rs02[0], &chassis_ptr->rs02[1], &chassis_ptr->rs02[2], chassis_ptr->ctrl.given_hit_pos, chassis_ptr->ctrl.given_hit_speed);
+            rs02_ctrl_3motor_pos_private(&chassis_ptr->rs02[0], &chassis_ptr->rs02[1], &chassis_ptr->rs02[2], chassis_ptr->ctrl.given_hit_pos, chassis_ptr->ctrl.given_hit_speed);
             rs02_ctrl_pos_private(&chassis_ptr->rs02[3], chassis_ptr->ctrl.given_pitch, 4.0f);
-            //osDelay(1);
-            //rs02_ctrl_pos_private(&chassis_ptr->rs02[4], chassis_ptr->ctrl.given_shoot_angle, 44.0f);
+            osDelay(1);
+            rs02_ctrl_pos_private(&chassis_ptr->rs02[4], chassis_ptr->ctrl.given_shoot_angle + ((fp32)chassis_ptr->rs02[4].ecd.ecd_offset / RS02_UINT16_MAX * 2.0f * RS02_ECD_MAX - RS02_ECD_MAX), chassis_ptr->ctrl.given_shoot_speed);
         }
             osDelay(1);
 
     }
-}
-
-static void gimbal_send_cmd(const robot_t* chassis_ptr)
-{
-    static uint8_t send_which = 0;
-    if (send_which == 0)
-    {
-        for (uint8_t i = 0; i < 3; i++)
-            rs02_ctrl_pos_private(&chassis_ptr->rs02[i], chassis_ptr->ctrl.given_hit_pos, chassis_ptr->ctrl.given_hit_speed);
-        send_which = 1;
-    }
-    else if (send_which == 1)
-    {
-        rs02_ctrl_pos_private(&chassis_ptr->rs02[3], chassis_ptr->ctrl.given_pitch, 4.0f);
-        send_which = 2;
-    }
-    else if (send_which == 2)
-    {
-        rs02_ctrl_pos_private(&chassis_ptr->rs02[4], chassis_ptr->ctrl.given_shoot_angle, 44.0f);
-        send_which = 0;
-    }
-    else
-        send_which = 0;
-
 }
 
 /**

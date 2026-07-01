@@ -11,6 +11,8 @@ void hc_init(GPIO_TypeDef* trig_port, const uint16_t trig_pin, GPIO_TypeDef* ech
     hc.echo_pin = echo_pin;
     hc.dis = 0;
     hc.echo_time = 0, hc.us = 0;
+    hc.last_dis = 0, hc.last_echo_time = 0;
+    hc.trig = 0;
 }
 
 void hc_trig()
@@ -36,6 +38,7 @@ void hc_echo()
     {
         hc.us = DWT_GetTimeline_us() - hc.echo_time;
         hc.dis = (fp32)hc.us * HC_DIS_FACTOR;
+        //if (hc.dis > 1000.0f) hc.dis = hc.last_dis;
         hc.vec = (hc.dis - hc.last_dis) * 0.01f / ((fp32)(hc.echo_time - hc.last_echo_time) / 1000000.0f);
         hc.last_echo_time = hc.echo_time;
         hc.last_dis = hc.dis;

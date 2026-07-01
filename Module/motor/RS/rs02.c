@@ -236,15 +236,15 @@ void rs02_ctrl_3motor_pos_private(const rs02_instance* rs02_ins1, const rs02_ins
     if (rs02_ins1->ecd.ecd_offset == 0 || rs02_ins2->ecd.ecd_offset == 0 || rs02_ins3->ecd.ecd_offset == 0)
         return;
     rs02_setparam_private(rs02_ins1, 0x7017, speed, Set_parameter);
-    osDelay(1);
+    //osDelay(1);
     rs02_setparam_private(rs02_ins2, 0x7017, speed, Set_parameter);
     osDelay(1);
     rs02_setparam_private(rs02_ins3, 0x7017, speed, Set_parameter);
-    osDelay(1);
+    //osDelay(1);
     rs02_setparam_private(rs02_ins1, 0x7016, angle + ((fp32)rs02_ins1->ecd.ecd_offset / RS02_UINT16_MAX * 2.0f * RS02_ECD_MAX - RS02_ECD_MAX) - 0.03f, Set_parameter);
     osDelay(1);
     rs02_setparam_private(rs02_ins2, 0x7016, angle + ((fp32)rs02_ins2->ecd.ecd_offset / RS02_UINT16_MAX * 2.0f * RS02_ECD_MAX - RS02_ECD_MAX) - 0.03f, Set_parameter);
-    osDelay(1);
+    //osDelay(1);
     rs02_setparam_private(rs02_ins3, 0x7016, angle + ((fp32)rs02_ins3->ecd.ecd_offset / RS02_UINT16_MAX * 2.0f * RS02_ECD_MAX - RS02_ECD_MAX) - 0.03f, Set_parameter);
     osDelay(1);
     // rs02_setparam_private(rs02_ins1, 0x7016, angle, Set_parameter);

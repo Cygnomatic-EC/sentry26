@@ -64,9 +64,15 @@ typedef enum
     SHOOT_SHOOT = 7, // 发球板击球
     SHOOT_DELAY_4 = 8, // 发球延时状态4
     SHOOT_BACK = 9, // 发球板回到原位
-    SHOOT_DELAY_5 = 10 // 发球延时状态5
+    SHOOT_DELAY_5 = 10, // 发球延时状态5
+
+    SHOOT_REPARE = 11, // 未防止连续接球设的状态，与SHOOT_PREPARE的接球状态一致
+    SHOOT_DELAY_6 = 12
 
 } Shoot_step;
+
+#define SHOOT_RECEIVE_POS 0.08f
+#define SHOOT_FIRE_PREPARE_ANGLE (-2.0f)
 
 // M3508 电机控制结构体
 typedef struct
@@ -83,7 +89,7 @@ typedef struct
     fp32 given_chassis_w; // 给定底盘自转角速度
     fp32 given_yaw; // 给定底盘Yaw角度
     fp32 given_pitch;
-    fp32 given_hit_pos, given_hit_speed, given_shoot_angle; // 给定击发球位置和速度
+    fp32 given_hit_pos, given_hit_speed, given_shoot_angle, given_shoot_speed; // 给定击发球位置和速度
     uint8_t shoot;
     Shoot_step shoot_step;
 
