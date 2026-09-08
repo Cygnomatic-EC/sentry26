@@ -26,7 +26,7 @@
 #define DBUS_MAX_LEN     (36)
 #define DBUS_BUFLEN      (18)
 #define DBUS_HUART       huart3
-#define DBUS_CANID        0x600
+#define DBUS_CANID        0x602
 
 typedef enum
 {

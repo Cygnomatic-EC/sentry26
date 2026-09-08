@@ -100,7 +100,7 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
         ARM_MATH_CM4;ARM_MATH_MATRIX_CHECK;ARM_MATH_ROUNDING
         MADE_BY_CMAKE
 
-        #CHASSIS
+        # CHASSIS
         OMNI
 )
 

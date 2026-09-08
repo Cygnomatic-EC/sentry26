@@ -10,7 +10,7 @@ osThreadId gimbal_taskHandle;
 osThreadId daemon_taskHandle;
 void task_init()
 {
-    Modules_Init();
+
 #ifdef CHASSIS
     osThreadDef(ChassisTask, Chassis_Task, osPriorityNormal, 0, 256);
     chassis_taskHandle = osThreadCreate(osThread(ChassisTask), NULL);

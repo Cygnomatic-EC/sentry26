@@ -9,7 +9,7 @@
 const fp32 filter_speed_alpha[3] = {0.2f, 0.2f, 0.2f};
 const pid_config m3508_pid_config = {.mode = PID_POSITION, .kp = 8.0f, .ki = 0.0f, .kd = 0.0f, .max_out = 16000.0f, .max_iout = 3000.0f,
     .out_limit_delta_P = 1000.0f, .out_limit_delta_N = 4000.0f, .deadzone = 0.0f};
-const pid_config mf9025_angle_pid_config = {.mode = PID_POSITION, .kp = 600.0f, .ki = 0.0f, .kd = 45000.0f, .max_out = 30000.0f, .max_iout = 3000.0f,
+const pid_config mf9025_angle_pid_config = {.mode = PID_POSITION, .kp = 600.0f, .ki = 0.0f, .kd = 45000.0f, .max_out = 12000.0f, .max_iout = 3000.0f,
     .out_limit_delta_P = 10000.0f, .out_limit_delta_N = 40000.0f, .deadzone = 0.0f};
 const uint16_t mf9025_speed_pid_config[3] = {80, 10, 10};
 chassis_t chassis;
@@ -406,7 +406,9 @@ static void chassis_send_wheelmotor_cmd(const chassis_t* chassis_ptr)
 }
 static void chassis_send_gimbalmotor_cmd(const chassis_t* chassis_ptr)
 {
-    const int32_t mf9025_speed_out = (int32_t)(chassis_ptr->ctrl.m9025_controller.pid.out[0] + chassis_ptr->ctrl.m9025_controller.ff_speed);
+    int32_t mf9025_speed_out = (int32_t)(chassis_ptr->ctrl.m9025_controller.pid.out[0] + chassis_ptr->ctrl.m9025_controller.ff_speed);
+    if (mf9025_speed_out > (int32_t)mf9025_angle_pid_config.max_out)
+        mf9025_speed_out = (int32_t)mf9025_angle_pid_config.max_out;
     mf9025_ctrl_speed(chassis_ptr->mf9025, MF9025_MAX_IQ, mf9025_speed_out);
 }
 

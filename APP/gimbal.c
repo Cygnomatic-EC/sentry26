@@ -1,8 +1,11 @@
 #include "gimbal.h"
 
-const pid_config yaw_pid_config = {.mode = PID_POSITION, .kp = 1500.0f, .ki = 0.0f, .kd = 100.0f, .max_out = 25000.0f, .max_iout = 3000.0f,
+// GM6020 rotation uses a cascaded angle-speed controller.
+const pid_config yaw_pid_config = {.mode = PID_POSITION, .kp = 15.0f, .ki = 0.0f, .kd = 0.0f, .max_out = GIMBAL_ROTATE_SPEED_MAX, .max_iout = 0.0f,
     .out_limit_delta_P = 1000.0f, .out_limit_delta_N = 4000.0f, .deadzone = 0.0f};
-const pid_config pitch_pid_config = {.mode = PID_POSITION, .kp = 1500.0f, .ki = 0.0f, .kd = 200.0f, .max_out = 25000.0f, .max_iout = 3000.0f,
+const pid_config pitch_pid_config = {.mode = PID_POSITION, .kp = 15.0f, .ki = 0.0f, .kd = 0.0f, .max_out = GIMBAL_ROTATE_SPEED_MAX, .max_iout = 0.0f,
+    .out_limit_delta_P = 1000.0f, .out_limit_delta_N = 4000.0f, .deadzone = 0.0f};
+const pid_config gimbal_speed_pid_config = {.mode = PID_POSITION, .kp = 100.0f, .ki = 0.0f, .kd = 0.0f, .max_out = 25000.0f, .max_iout = 3000.0f,
     .out_limit_delta_P = 1000.0f, .out_limit_delta_N = 4000.0f, .deadzone = 0.0f};
 const pid_config friction_pid_config = {.mode = PID_POSITION, .kp = 8.0f, .ki = 0.0f, .kd = 0.0f, .max_out = 16000.0f, .max_iout = 3000.0f,
     .out_limit_delta_P = 1000.0f, .out_limit_delta_N = 4000.0f, .deadzone = 0.0f};
@@ -85,6 +88,8 @@ static void gimbal_pid_init(gimbal_t* gimbal_ptr)
 {
     PID_init(&gimbal_ptr->ctrl.angle_ctrl[0].pid, yaw_pid_config);
     PID_init(&gimbal_ptr->ctrl.angle_ctrl[1].pid, pitch_pid_config);
+    PID_init(&gimbal_ptr->ctrl.angle_ctrl[0].speed_pid, gimbal_speed_pid_config);
+    PID_init(&gimbal_ptr->ctrl.angle_ctrl[1].speed_pid, gimbal_speed_pid_config);
     PID_init(&gimbal_ptr->ctrl.friction_ctrl[0].pid, friction_pid_config);
     PID_init(&gimbal_ptr->ctrl.friction_ctrl[1].pid, friction_pid_config);
     PID_init(&gimbal_ptr->ctrl.trigger_ctrl.pid, trigger_pid_config);
@@ -130,11 +135,13 @@ static void gimbal_calc_target_angle(gimbal_t* gimbal_ptr)
 
 static void gimbal_calc_current_angle(gimbal_t* gimbal_ptr)
 {
-    fp32 ypr[3];
-    ypr[0] = gimbal_ptr->hi12->imu_data.yaw;
-    ypr[1] = gimbal_ptr->hi12->imu_data.pitch;
-    ypr[2] = gimbal_ptr->hi12->imu_data.roll;
-    Angle_Update(&gimbal_ptr->angle, ypr);
+    const int pitch_ecd = gimbal_ptr->angle_motor->ecd[0].ecd;
+    const int yaw_ecd = gimbal_ptr->angle_motor->ecd[1].ecd;
+
+    gimbal_ptr->angle.yaw_deg =
+        theta_format((fp32)yaw_ecd * 360.0f / 8192.0f - ECD_YAW_OFFSET);
+    gimbal_ptr->angle.pitch_deg =
+        theta_format((fp32)pitch_ecd * 360.0f / 8192.0f - ECD_PITCH_OFFSET);
 }
 
 static void gimbal_fire_confirm(gimbal_t* gimbal_ptr)
@@ -150,10 +157,21 @@ static void gimbal_fire_confirm(gimbal_t* gimbal_ptr)
 
 static void gimbal_calc_rotate_pidout(gimbal_t* gimbal_ptr)
 {
+    // Outer angle loop: angle error -> target motor speed.
     PID_calc(&gimbal_ptr->ctrl.angle_ctrl[0].pid, gimbal_ptr->angle.pitch_deg, gimbal_ptr->ctrl.target_pitch);
-    gimbal_ptr->ctrl.angle_ctrl[0].out = gimbal_ptr->ctrl.angle_ctrl[0].pid.out[0];
+    gimbal_ptr->ctrl.angle_ctrl[0].given_speed = (int16_t)gimbal_ptr->ctrl.angle_ctrl[0].pid.out[0];
+    // Inner speed loop: speed error -> GM6020 voltage command.
+    PID_calc(&gimbal_ptr->ctrl.angle_ctrl[0].speed_pid,
+             gimbal_ptr->angle_motor->ecd[0].speed,
+             gimbal_ptr->ctrl.angle_ctrl[0].given_speed);
+    gimbal_ptr->ctrl.angle_ctrl[0].out = gimbal_ptr->ctrl.angle_ctrl[0].speed_pid.out[0];
+
     PID_calc(&gimbal_ptr->ctrl.angle_ctrl[1].pid, gimbal_ptr->angle.yaw_deg, gimbal_ptr->ctrl.target_yaw);
-    gimbal_ptr->ctrl.angle_ctrl[1].out = gimbal_ptr->ctrl.angle_ctrl[1].pid.out[0];
+    gimbal_ptr->ctrl.angle_ctrl[1].given_speed = (int16_t)gimbal_ptr->ctrl.angle_ctrl[1].pid.out[0];
+    PID_calc(&gimbal_ptr->ctrl.angle_ctrl[1].speed_pid,
+             gimbal_ptr->angle_motor->ecd[1].speed,
+             gimbal_ptr->ctrl.angle_ctrl[1].given_speed);
+    gimbal_ptr->ctrl.angle_ctrl[1].out = gimbal_ptr->ctrl.angle_ctrl[1].speed_pid.out[0];
 }
 static void gimbal_calc_friction_pidout(gimbal_t* gimbal_ptr)
 {

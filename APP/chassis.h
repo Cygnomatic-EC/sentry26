@@ -15,14 +15,14 @@
 #include "COMM/CBoard_chassis.h"
 
 #define GIMBAL_ANGLE_DELTA_MAX 0.12f
-#define CHASSIS_MAX_V 8.0f // 底盘最大线速度 m/s
-#define CHASSIS_MAX_W 8.0f // 底盘最大角速度 rad/s
+#define CHASSIS_MAX_V 2.0f // 底盘最大线速度 m/s
+#define CHASSIS_MAX_W 1.0f // 底盘最大角速度 rad/s
 
 #define CHASSIS_CONTROL_TIME 0.003f // 控制周期 3ms
 #define RAD_TO_DEG_FACTOR 5729.5779513f // 弧度转角度系数
 #define DEG_PER_CIRCLE 360.0f // 一圈的角度
 #define TORQUE_TO_CURRENT_FACTOR 0.3f // 扭矩转电流系数
-#define SPIN_VW_SPEED 2.0f // 旋转摸鱼(小陀螺)角速度
+#define SPIN_VW_SPEED 0.1f // 旋转摸鱼(小陀螺)角速度
 
 #define REDUCTION_RATIO 19.2032f // 减速比
 #define WHEEL_RADIUS 0.08f // 轮子半径，单位m

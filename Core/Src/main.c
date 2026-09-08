@@ -26,6 +26,7 @@
 #include "usart.h"
 #include "usb_device.h"
 #include "gpio.h"
+#include "module_init.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -106,7 +107,7 @@ int main(void)
   MX_TIM10_Init();
   MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
-
+  Modules_Init();
   /* USER CODE END 2 */
 
   /* Call init function for freertos objects (in cmsis_os2.c) */

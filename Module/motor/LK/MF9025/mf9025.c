@@ -27,11 +27,11 @@ MF9025_Status_t mf9025_init(CAN_HandleTypeDef *hcan, const uint32_t txid)
 void mf9025_speed_init(const mf9025_instance* mf9025_ins, const uint16_t pid_v[3])
 {
     if (mf9025_ins == NULL) return;
-    while (mf9025_ins->ecd.ecd_offset == 0)
-    {
-        mf9025_get_measure(mf9025_ins);
-        osDelay(5);
-    }
+    // while (mf9025_ins->ecd.ecd_offset == 0)
+    // {
+    //     mf9025_get_measure(mf9025_ins);
+    //     osDelay(5);
+    // }
     osDelay(1000);
     for (int i = 0; i < 10; i++)
     {

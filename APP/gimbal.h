@@ -15,6 +15,7 @@
 #define TRIGGER_SPEED_MAX 1000
 #define FRICTION_SPEED_MAX 10000
 #define FRICTION_READY_SPEED 3000
+#define GIMBAL_ROTATE_SPEED_MAX 320
 #define YAW_LIMIT 30.0f
 #define PITCH_LIMIT 20.0f
 #define ECD_YAW_OFFSET 60.0f
@@ -47,9 +48,10 @@ typedef struct
 // GM6020 电机控制结构体
 typedef struct
 {
-    pid_t pid; // PID控制器
-    int16_t given_speed; // 给定速度
-    fp32 out; // 输出值
+    pid_t pid; // angle loop PID
+    pid_t speed_pid; // speed loop PID
+    int16_t given_speed; // speed loop setpoint
+    fp32 out; // speed loop output
 } angle_ctrl_t;
 
 typedef struct
