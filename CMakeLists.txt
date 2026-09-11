@@ -34,6 +34,7 @@ enable_language(C ASM)
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME}
 
+
 )
 
 # Add STM32CubeMX generated sources
@@ -61,6 +62,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         Module/motor/DJI/M2006/m2006.c
         Module/motor/LK/MF9025/mf9025.c
         Module/motor/RS/rs02.c
+        Module/motor/VESC/vesc.c
         Module/DBUS/dbus.c
         Module/NX/nx.c
         Module/Odom/odom.c

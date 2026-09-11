@@ -18,7 +18,7 @@ void Modules_Init(void)
     BMI088_Init();
     INS_Init();
     m3508_init(&hcan1, M3508_TX_1, 3);
-    for (uint8_t i = 3; i < 4; i++)
+    for (uint8_t i = 0; i < 5; i++)
     {
         rs02_init(&hcan2, i + 0x01, 0xFD, RS02_MODE_POS, RS02_PROTOCOL_PRIVATE);
         osDelay(1);

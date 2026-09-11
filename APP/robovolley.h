@@ -9,13 +9,14 @@
 #include "Odom/odom.h"
 #include "NX/nx.h"
 #include "motor/RS/rs02.h"
-#include "HC-SR04/hc.h"
+//#include "HC-SR04/hc.h"
 #include "VOFA/vofa.h"
+#include "motor/VESC/vesc.h"
 
 #define PITCH_DELTA_MAX (-0.000001f)
 #define PITCH_MAX (0.1f)
 #define PITCH_MIN (-0.8f)
-#define CHASSIS_MAX_V 2.0f // 底盘最大线速度 m/s
+#define CHASSIS_MAX_V 4.0f // 底盘最大线速度 m/s
 #define CHASSIS_MAX_W 2.0f // 底盘最大角速度 rad/s
 
 #define CHASSIS_CONTROL_TIME 0.003f // 控制周期 3ms
@@ -34,6 +35,8 @@
 #define MIT_PITCH_TORCH 1.5f
 #define MIT_KP 10.0f
 #define MIT_KD 0.5f
+
+#define VESC_SPEED 80
 
 #define ms_to_us(ms) ((uint64_t)(ms * 1000))
 
@@ -71,8 +74,8 @@ typedef enum
 
 } Shoot_step;
 
-#define SHOOT_RECEIVE_POS 0.08f
-#define SHOOT_FIRE_PREPARE_ANGLE (-2.0f)
+#define SHOOT_RECEIVE_POS 0.045f
+#define SHOOT_FIRE_PREPARE_ANGLE (-1.9f)
 
 // M3508 电机控制结构体
 typedef struct
@@ -91,6 +94,7 @@ typedef struct
     fp32 given_pitch;
     fp32 given_hit_pos, given_hit_speed, given_shoot_angle, given_shoot_speed; // 给定击发球位置和速度
     uint8_t shoot;
+    uint8_t move;
     Shoot_step shoot_step;
 
     first_order_filter_type_t chassis_speed_filter[3]; // 底盘速度一阶低通滤波 [0]x向 [1]y向 [2]角速度
@@ -112,10 +116,11 @@ typedef struct
     rc_instance rc; // 遥控器实例
     m3508_instance m3508; // 3508电机实例
     rs02_instance rs02[5]; // RS02电机实例
+    vesc_instance_t *vesc;
     INS_t ins; // 惯性导航系统实例
     nx_ctrl_t nx_ctrl;
     odom_t odom; // 里程计实例
-    hc_t *hc;
+    //hc_t *hc;
     vofa_t *vofa;
 
 } robot_t;
