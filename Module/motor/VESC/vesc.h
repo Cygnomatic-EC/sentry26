@@ -1,0 +1,8 @@
+//
+// Created by 21526 on 2026/7/3.
+//
+
+#ifndef STANDARD_ROBOT_C_VESC_H
+#define STANDARD_ROBOT_C_VESC_H
+
+#endif //STANDARD_ROBOT_C_VESC_H
