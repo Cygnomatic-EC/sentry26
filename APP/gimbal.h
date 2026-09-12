@@ -10,10 +10,11 @@
 #include "NX/nx.h"
 #include "DBUS/dbus.h"
 #include "IMU/HI12/hi12.h"
+#include "VOFA/vofa.h"
 
 #define SMALL_GIMBAL_ANGLE_DELTA_MAX 0.08f
 #define TRIGGER_SPEED_MAX 1000
-#define FRICTION_SPEED_MAX 10000
+#define FRICTION_SPEED_MAX 5000
 #define FRICTION_READY_SPEED 3000
 #define GIMBAL_ROTATE_SPEED_MAX 320
 #define YAW_LIMIT 30.0f
@@ -81,6 +82,8 @@ typedef struct
     nx_ctrl_t* nx_ctrl;
     rc_instance* rc;
     hi12_t* hi12;
+
+    vofa_t* vofa;
 } gimbal_t;
 
 void Gimbal_Init(gimbal_t* gimbal_ptr);

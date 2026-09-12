@@ -51,3 +51,8 @@ void vofa_print(const fp32* data)
     memcpy(txdata + vofa_instance.tx_num * sizeof(fp32), tail, 4);
     BSP_UART_Transmit_To_Mail(&vofa_instance.vofa_uart, (uint8_t*)txdata, vofa_instance.tx_num * sizeof(fp32) + 4, 100);
 }
+
+vofa_t* Get_Vofa_Ptr()
+{
+    return &vofa_instance;
+}

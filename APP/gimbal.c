@@ -1,13 +1,12 @@
 #include "gimbal.h"
 
-// GM6020 rotation uses a cascaded angle-speed controller.
-const pid_config yaw_pid_config = {.mode = PID_POSITION, .kp = 15.0f, .ki = 0.0f, .kd = 0.0f, .max_out = GIMBAL_ROTATE_SPEED_MAX, .max_iout = 0.0f,
+const pid_config yaw_pid_config = {.mode = PID_POSITION, .kp = 12.0f, .ki = 0.0f, .kd = 0.0f, .max_out = GIMBAL_ROTATE_SPEED_MAX, .max_iout = 0.0f,
     .out_limit_delta_P = 1000.0f, .out_limit_delta_N = 4000.0f, .deadzone = 0.0f};
-const pid_config pitch_pid_config = {.mode = PID_POSITION, .kp = 15.0f, .ki = 0.0f, .kd = 0.0f, .max_out = GIMBAL_ROTATE_SPEED_MAX, .max_iout = 0.0f,
+const pid_config pitch_pid_config = {.mode = PID_POSITION, .kp = 13.0f, .ki = 0.0f, .kd = 0.0f, .max_out = GIMBAL_ROTATE_SPEED_MAX, .max_iout = 0.0f,
     .out_limit_delta_P = 1000.0f, .out_limit_delta_N = 4000.0f, .deadzone = 0.0f};
 const pid_config gimbal_speed_pid_config = {.mode = PID_POSITION, .kp = 100.0f, .ki = 0.0f, .kd = 0.0f, .max_out = 25000.0f, .max_iout = 3000.0f,
     .out_limit_delta_P = 1000.0f, .out_limit_delta_N = 4000.0f, .deadzone = 0.0f};
-const pid_config friction_pid_config = {.mode = PID_POSITION, .kp = 8.0f, .ki = 0.0f, .kd = 0.0f, .max_out = 16000.0f, .max_iout = 3000.0f,
+const pid_config friction_pid_config = {.mode = PID_POSITION, .kp = 3.0f, .ki = 0.0f, .kd = 1.0f, .max_out = 16000.0f, .max_iout = 3000.0f,
     .out_limit_delta_P = 1000.0f, .out_limit_delta_N = 4000.0f, .deadzone = 0.0f};
 const pid_config trigger_pid_config = {.mode = PID_POSITION, .kp = 8.0f, .ki = 0.0f, .kd = 0.0f, .max_out = 16000.0f, .max_iout = 3000.0f,
     .out_limit_delta_P = 1000.0f, .out_limit_delta_N = 4000.0f, .deadzone = 0.0f};
@@ -29,6 +28,7 @@ static void gimbal_send_trigger_cmd(const gimbal_t* gimbal_ptr);
 static void gimbal_send_rotate_cmd(const gimbal_t* gimbal_ptr);
 static void gimbal_send_rc(const gimbal_t* gimbal_ptr);
 static void gimbal_send_angle(const gimbal_t* gimbal_ptr);
+static void gimbal_debug(const gimbal_t* gimbal_ptr);
 
 void Gimbal_Init(gimbal_t* gimbal_ptr)
 {
@@ -40,8 +40,10 @@ void Gimbal_Init(gimbal_t* gimbal_ptr)
     gimbal_ptr->hi12 = Get_HI12_Instance();
 
     gimbal_ptr->angle_motor = Get_GM6020_Ptr(GM6020_TX_2);
-    gimbal_ptr->trigger_motor = Get_M2006_Ptr(M2006_TX_1);
-    gimbal_ptr->friction_motor = Get_M3508_Ptr(M3508_TX_2);
+    gimbal_ptr->trigger_motor = Get_M2006_Ptr(M2006_TX_2);
+    gimbal_ptr->friction_motor = Get_M3508_Ptr(M3508_TX_1);
+
+    gimbal_ptr->vofa = Get_Vofa_Ptr();
 
     gimbal_pid_init(gimbal_ptr);
 }
@@ -78,6 +80,8 @@ void Gimbal_Task(const void* argument)
             gimbal_send_rc(&gimbal);
         else if (ctrl_loop % 5 == 1)
             gimbal_send_angle(&gimbal);
+        else if (ctrl_loop % 5 == 2)
+            gimbal_debug(&gimbal);
 
         ctrl_loop++;
         if (ctrl_loop > 3000) ctrl_loop = 0;
@@ -111,7 +115,7 @@ static void gimbal_calc_target_angle(gimbal_t* gimbal_ptr)
     {
         gimbal_ptr->ctrl.target_yaw -= (fp32)gimbal_ptr->rc->rc_data.ch0 * SMALL_GIMBAL_ANGLE_DELTA_MAX / RC_VAL_MAX;
         gimbal_ptr->ctrl.target_pitch += (fp32)gimbal_ptr->rc->rc_data.ch1 * SMALL_GIMBAL_ANGLE_DELTA_MAX / RC_VAL_MAX;
-        gimbal_ptr->ctrl.fire = gimbal_ptr->rc->rc_data.ch3 > (RC_CH_VALUE_MAX - RC_CH_VALUE_OFFSET) / 2 ? 1 : 0;
+        gimbal_ptr->ctrl.fire = gimbal_ptr->rc->rc_data.roll > (RC_CH_VALUE_MAX - RC_CH_VALUE_OFFSET) / 2 ? 1 : 0;
         gimbal_ptr->ctrl.open_friction = (gimbal_ptr->rc->rc_data.s2 == 2) ? 1 : 0;
     }
     else if (gimbal_ptr->ctrl.gimbal_controller == GIMBAL_UPC)
@@ -126,11 +130,8 @@ static void gimbal_calc_target_angle(gimbal_t* gimbal_ptr)
         gimbal_ptr->ctrl.fire = 0;
         gimbal_ptr->ctrl.open_friction = 0;
     }
-    if (gimbal_ptr->ctrl.target_yaw > YAW_LIMIT)
-        gimbal_ptr->ctrl.target_yaw = YAW_LIMIT;
-    else if (gimbal_ptr->ctrl.target_yaw < -YAW_LIMIT)
-        gimbal_ptr->ctrl.target_yaw = -YAW_LIMIT;
-    gimbal_ptr->ctrl.target_pitch = loop_float_constrain(gimbal_ptr->ctrl.target_pitch, -PITCH_LIMIT, PITCH_LIMIT);
+    float_constrain(&gimbal_ptr->ctrl.target_yaw, -YAW_LIMIT, YAW_LIMIT);
+    float_constrain(&gimbal_ptr->ctrl.target_pitch, -PITCH_LIMIT, PITCH_LIMIT);
 }
 
 static void gimbal_calc_current_angle(gimbal_t* gimbal_ptr)
@@ -157,10 +158,8 @@ static void gimbal_fire_confirm(gimbal_t* gimbal_ptr)
 
 static void gimbal_calc_rotate_pidout(gimbal_t* gimbal_ptr)
 {
-    // Outer angle loop: angle error -> target motor speed.
     PID_calc(&gimbal_ptr->ctrl.angle_ctrl[0].pid, gimbal_ptr->angle.pitch_deg, gimbal_ptr->ctrl.target_pitch);
     gimbal_ptr->ctrl.angle_ctrl[0].given_speed = (int16_t)gimbal_ptr->ctrl.angle_ctrl[0].pid.out[0];
-    // Inner speed loop: speed error -> GM6020 voltage command.
     PID_calc(&gimbal_ptr->ctrl.angle_ctrl[0].speed_pid,
              gimbal_ptr->angle_motor->ecd[0].speed,
              gimbal_ptr->ctrl.angle_ctrl[0].given_speed);
@@ -233,4 +232,8 @@ static void gimbal_send_angle(const gimbal_t* gimbal_ptr)
     const fp32 quaternion[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     NX_SendAngle(quaternion);
 }
-
+static void gimbal_debug(const gimbal_t* gimbal_ptr)
+{
+    const fp32 debug[4] = {(float)gimbal_ptr->ctrl.angle_ctrl[1].given_speed, (float)gimbal_ptr->angle_motor[1].ecd->speed, gimbal_ptr->ctrl.target_yaw, gimbal_ptr->angle.yaw_deg};
+    vofa_print(debug);
+}

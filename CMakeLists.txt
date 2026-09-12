@@ -64,7 +64,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         Module/NUC/nuc.c
         Module/NX/nx.c
         Module/Referee/referee.c
-        Module/COMM/comm.c
+        # Module/COMM/comm.c
         Module/COMM/CBoard_chassis.c
         Module/COMM/CBoard_gimbal.c
         Module/IMU/BMI088/BMI088Middleware.c

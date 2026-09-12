@@ -17,6 +17,7 @@
 #include "motor/DJI/M2006/m2006.h"
 #include "NX/nx.h"
 #include "Super_Cap/super_cap.h"
+#include "VOFA/vofa.h"
 
 void Modules_Init(void) {
     DWT_Init(DWT_CLOCK_FREQ);
@@ -37,8 +38,9 @@ void Modules_Init(void) {
     CBoard_Gimbal_Init(&hcan2);
     NX_Init(&hcan2);
     HI12_Init(&huart1);
-    m3508_init(&hcan1, M3508_TX_2, 2);
-    m2006_init(&hcan1, M2006_TX_1, 1);
+    vofa_init(&huart6, 4, 0);
+    m3508_init(&hcan1, M3508_TX_1, 2);
+    m2006_init(&hcan1, M2006_TX_2, 1);
     gm6020_init(&hcan1, GM6020_TX_2, 2);
 #endif
 }
